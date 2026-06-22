@@ -1,0 +1,53 @@
+{
+  "offer_id": "123456789",
+  "url": "https://detail.1688.com/offer/123456789.html",
+  "title_zh": "黑胶防晒晴雨伞 三折遮阳伞",
+  "title_ko_optional": null,
+  "price_tiers": [
+    {"min_quantity": 2, "price": 18.8, "currency": "CNY"},
+    {"min_quantity": 50, "price": 15.2, "currency": "CNY"},
+    {"min_quantity": 500, "price": 12.5, "currency": "CNY"}
+  ],
+  "sku_options": [
+    {"name": "颜色", "values": ["黑色", "米色", "粉色"]},
+    {"name": "规格", "values": ["三折", "五折"]}
+  ],
+  "attributes": {
+    "材质": "碰击布",
+    "伞布过胶": "黑胶",
+    "适用对象": "成人"
+  },
+  "category": "伞具",
+  "stock": 5600,
+  "month_sold": 3200,
+  "trade_volume": 8900,
+  "repurchase_rate": 0.34,
+  "seller": {
+    "name": "义乌优伞工厂",
+    "url": "https://example.1688.com",
+    "score": 4.8,
+    "level": "实力商家",
+    "location": "浙江 金华",
+    "years_active": 6,
+    "badges": ["实力商家", "源头工厂"]
+  },
+  "main_image_urls": [
+    "https://example.com/assets/123456789-main-1.jpg",
+    "https://example.com/assets/123456789-main-2.jpg"
+  ],
+  "detail_image_urls": [
+    "https://example.com/assets/123456789-detail-1.jpg",
+    "https://example.com/assets/123456789-detail-2.jpg"
+  ],
+  "option_image_urls": [
+    "https://example.com/assets/123456789-black.jpg"
+  ],
+  "video_urls": [
+    "https://example.com/assets/123456789-video.mp4"
+  ],
+  "raw_source_summary": {
+    "provider": "fixture",
+    "fixture": "product_detail_sample.json"
+  },
+  "missing_fields": []
+}

@@ -1,0 +1,25 @@
+{
+  "status": "ok",
+  "items": [
+    {
+      "offer_id": "222333444",
+      "url": "https://detail.1688.com/offer/222333444.html",
+      "title_zh": "同款黑胶晴雨伞",
+      "image_url": "https://cbu01.alicdn.com/img/ibank/O1CN-image-search.jpg",
+      "price_min": 10.5,
+      "price_max": 13.8,
+      "currency": "CNY",
+      "moq": 2,
+      "month_sold": 2100,
+      "trade_volume": 5100,
+      "repurchase_rate": 0.28,
+      "seller_name": "图片同款工厂",
+      "seller_score": 4.6,
+      "badges": ["同款推荐"],
+      "shipping_badges": ["48小时发货"],
+      "is_one_piece_dropship_available": true,
+      "source_keyword": "image-search",
+      "missing_fields": []
+    }
+  ]
+}

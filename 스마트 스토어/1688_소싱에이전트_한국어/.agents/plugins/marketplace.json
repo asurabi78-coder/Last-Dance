@@ -1,0 +1,20 @@
+{
+  "name": "sourcing-agent-1688-marketplace",
+  "interface": {
+    "displayName": "1688 Sourcing Agent"
+  },
+  "plugins": [
+    {
+      "name": "sourcing-agent-1688",
+      "source": {
+        "source": "local",
+        "path": "./plugins/sourcing-agent-1688"
+      },
+      "policy": {
+        "installation": "INSTALLED_BY_DEFAULT",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "hot_keywords": [
+    {"keyword": "黑胶伞", "category_id": "1042954", "rank": 1, "heat": 98.2},
+    {"keyword": "遮阳伞", "category_id": "1042954", "rank": 2, "heat": 93.5},
+    {"keyword": "防晒伞", "category_id": "1042954", "rank": 3, "heat": 90.1}
+  ],
+  "rankings": [
+    {
+      "rank": 1,
+      "keyword": "黑胶伞",
+      "offer_id": "123456789",
+      "title_zh": "黑胶防晒晴雨伞 三折遮阳伞",
+      "score": 98.2,
+      "url": "https://detail.1688.com/offer/123456789.html"
+    }
+  ]
+}

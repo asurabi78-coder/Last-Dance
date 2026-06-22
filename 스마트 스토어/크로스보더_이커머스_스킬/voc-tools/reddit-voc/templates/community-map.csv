@@ -1,0 +1,12 @@
+dimension,subreddit,subscribers,activity_per_day,relevance_1_to_5,notes
+D1_category_brand,r/LitterRobot,15000,5_posts,5,"竞品直接社区,吐槽密集"
+D1_category_brand,r/CatCare,820000,80_posts,4,"品类外延,信息密度中"
+D2_lifestyle_demographic,r/SoloLiving,200000,30_posts,4,"独居人群,猫主重叠度高"
+D2_lifestyle_demographic,r/CrazyCatLadies,90000,20_posts,4,"猫主人群标签社区"
+D2_lifestyle_demographic,r/Apartments,1200000,150_posts,3,"租房场景,空间约束话题"
+D3_problem_help,r/CatHealth,180000,25_posts,5,"具体健康问题,SEO 长尾词金矿"
+D3_problem_help,r/AskVet,400000,60_posts,4,"专业问答,可信度高"
+D3_problem_help,r/CatLitterTraining,8000,2_posts,4,"非常垂直,刚需性强"
+D4_values_ideology,r/ZeroWaste,800000,80_posts,3,"环保红线,营销必避"
+D4_values_ideology,r/AntiConsumption,500000,40_posts,3,"反过度消费,智能化话术要谨慎"
+D4_values_ideology,r/BuyItForLife,1100000,100_posts,4,"耐用 + 终身保修话术机会"

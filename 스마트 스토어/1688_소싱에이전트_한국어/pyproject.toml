@@ -1,0 +1,45 @@
+[project]
+name = "sourcing1688"
+version = "0.5.30"
+description = "1688 Sourcing Agent tools for Korean sellers"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "sourcing1688 contributors" }]
+dependencies = [
+  "anyio>=4.4.0",
+  "beautifulsoup4>=4.12.0",
+  "duckdb>=1.0.0",
+  "httpx>=0.27.0",
+  "mcp>=1.2.0",
+  "playwright>=1.45.0",
+  "pydantic>=2.7.0",
+  "typer>=0.12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.2.0",
+]
+
+[project.scripts]
+sourcing1688 = "sourcing1688.cli:main"
+sourcing-agent-1688 = "sourcing1688.cli:main"
+sourcing1688-mcp = "sourcing1688.mcp_server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sourcing1688"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"plugins/sourcing-agent-1688" = "plugins/sourcing-agent-1688"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+  "live: opt-in live 1688 smoke tests; skipped unless SOURCING1688_LIVE_SMOKE=true",
+]

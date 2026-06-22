@@ -1,0 +1,36 @@
+{
+  "result": {
+    "success": true,
+    "result": [
+      {
+        "offerId": 123456789,
+        "subject": "黑胶防晒晴雨伞 三折遮阳伞",
+        "subjectTrans": "Black coating sun umbrella",
+        "imageUrl": "https://cbu01.alicdn.com/img/ibank/O1CN-main.jpg",
+        "priceInfo": {
+          "price": "12.50",
+          "promotionPrice": "11.80",
+          "consignPrice": "13.20"
+        },
+        "monthSold": 3200,
+        "tradeVolume": 8900,
+        "repurchaseRate": "34%",
+        "minOrderQuantity": 2,
+        "tradeScore": 4.8,
+        "sellerDataInfo": {
+          "companyName": "义乌优伞工厂",
+          "shopUrl": "https://example.1688.com",
+          "compositeServiceScore": 4.8,
+          "tradeMedalLevel": "实力商家",
+          "sellerIdentities": ["tp_member", "factory"]
+        },
+        "productSimpleShippingInfo": {
+          "shippingTimeGuarantee": "48小时发货"
+        },
+        "isOnePsale": true,
+        "offerIdentities": ["1688Selection", "certifiedFactory"],
+        "promotionURL": "https://detail.1688.com/offer/123456789.html"
+      }
+    ]
+  }
+}

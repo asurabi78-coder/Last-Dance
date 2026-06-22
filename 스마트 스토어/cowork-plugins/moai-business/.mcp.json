@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "dart": {
+      "command": "python3",
+      "args": ["-m", "dart_mcp_server"],
+      "env": {
+        "DART_API_KEY": "${DART_API_KEY}"
+      }
+    }
+  }
+}

@@ -1,0 +1,6 @@
+post_id,post_url,subreddit,dimension,post_type,title,user_quote,emotion_intensity_0_10,value_signal,alternative_solution,business_use
+P001,https://reddit.com/r/example/abc123,r/LitterRobot,D1,Rant,"I hate cleaning my old auto box","I have to take it apart into 7 pieces every week",9,BIFL_耐用诉求,"DIY: 用手动猫砂盆 + 周末勤铲",Listing 主标题 + 差异化卖点
+P002,https://reddit.com/r/example/def456,r/CatHealth,D3,Question,"Why does my Litter-Robot show sensor error?","Cycled 3 times today, sensor keeps erroring",6,无,"擦传感器手动重启",客服话术 + A+ Content 预防说明
+P003,https://reddit.com/r/example/ghi789,r/SoloLiving,D2,Discussion,"Studio apartment cat owners — what's your setup?","Mine has to fit under the kitchen sink",5,极简生活,"用普通猫砂盆 + 频繁清理",细分场景产品机会
+P004,https://reddit.com/r/example/jkl012,r/ZeroWaste,D4,Discussion,"Are smart litter boxes wasteful?","All that plastic, and they break in 3 years",7,ZeroWaste 红线,"用可堆肥竹纤维猫砂",营销规避项 + 可修复设计宣传
+P005,https://reddit.com/r/example/mno345,r/CatCare,D1,Recommendation,"Best automatic litter box for elderly cats?","My cat is 15 — can't jump high anymore",8,无,"低姿态手动盆 + 老人帮忙",老猫细分新品机会

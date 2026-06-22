@@ -1,0 +1,34 @@
+# Per-repo security pre-commit rules — additions to default.txt
+#
+# Format: SEVERITY|PATTERN|DESCRIPTION
+#   SEVERITY = BLOCK (rejects commit) | WARN (prints warning, allows commit)
+#   PATTERN  = extended-regex (passed to `grep -E`)
+#
+# Add rules specific to YOUR repo here. Examples below — tune for your project.
+
+# ============================================================================
+# Identity Isolation — names/emails/handles that shouldn't be in this repo
+# ============================================================================
+# WARN|alex.?wong|Founder real name (use generic example placeholders instead)
+# BLOCK|alex@example\.com|Personal email address
+
+# ============================================================================
+# Brand isolation — for public skill repos that should be category-neutral
+# ============================================================================
+# Example: a public e-commerce skills repo shouldn't reference your specific
+# competitors in templates / examples. Genericize them.
+# WARN|brand_a|brand_b|brand_c|Specific competitor names — use generic placeholders
+
+# ============================================================================
+# Internal infrastructure (private repos that shouldn't leak hostnames if
+# documentation/code is ever made public)
+# ============================================================================
+# BLOCK|api\.internal\.yourorg\.com|Internal API hostname
+# BLOCK|212\.28\.182\.160|Internal VPS IP (rotate if leaked)
+
+# ============================================================================
+# Known-leaked credentials — remind on re-introduction
+# ============================================================================
+# After rotating a leaked credential, you can add the OLD value here as BLOCK
+# so a stray re-paste from old code/notes triggers the hook.
+# BLOCK|14a5bbed33ad1|Known-leaked proxy username (rotated 2026-MM-DD; never reintroduce)

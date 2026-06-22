@@ -1,0 +1,2 @@
+outlet,outlet_domain,journalist,muckrack_url,topic_match_count,last_topic_article_url,last_topic_article_date,relevance_score,email_1,email_2,email_3,email_verified
+teenvogue,teenvogue.com,Sara Delgado,https://muckrack.com/sara-delgado,2,https://www.teenvogue.com/story/example-period-article,2025-08-12,75,sara_delgado@teenvogue.com,sara.delgado@teenvogue.com,sdelgado@teenvogue.com,smtp_ok

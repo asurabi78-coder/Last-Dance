@@ -1,0 +1,13 @@
+{
+  "name": "moai-productivity",
+  "displayName": "자기관리/생산성",
+  "version": "2.27.0",
+  "description": "자기관리·생산성 — 회고, 목표관리, 시간관리, 습관·루틴, 자기돌봄, 노션 템플릿, 주간보고",
+  "author": {
+    "name": "모두의AI"
+  },
+  "keywords": [
+    "생산성", "회고", "목표관리", "시간관리", "습관", "루틴", "노션", "자기관리"
+  ],
+  "license": "LicenseRef-MoAI-NC-ND-1.0"
+}

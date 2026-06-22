@@ -1,0 +1,86 @@
+baseURL = "https://cowork.mo.ai.kr/"
+title = "Claude Cowork 한국어 문서"
+languageCode = "ko-KR"
+defaultContentLanguage = "ko"
+hasCJKLanguage = true
+enableGitInfo = true
+enableRobotsTXT = true
+theme = "hugo-geekdoc"
+
+# Geekdoc 권장 설정
+pluralizeListTitles = false
+disablePathToLower = true
+
+# 코드 하이라이팅
+[markup]
+  [markup.goldmark.renderer]
+    unsafe = true
+  [markup.tableOfContents]
+    startLevel = 1
+    endLevel = 9
+  [markup.highlight]
+    style = "tokyonight-night"
+    lineNos = false
+    noClasses = false
+
+# Geekdoc 권장 미디어 타입
+[outputs]
+  home = ["HTML", "RSS", "SEARCH", "SITEMAP"]
+  page = ["HTML"]
+  section = ["HTML", "RSS"]
+
+[outputFormats]
+  [outputFormats.SEARCH]
+    baseName = "search"
+    isPlainText = true
+    mediaType = "application/json"
+    notAlternative = true
+  [outputFormats.SITEMAP]
+    baseName = "sitemap"
+    isPlainText = true
+    mediaType = "application/xml"
+    notAlternative = true
+
+[mediaTypes]
+  [mediaTypes."application/xml"]
+    suffixes = ["xml"]
+
+# Geekdoc 사이트 파라미터
+[params]
+  # ⚠️ SSOT (Single Source of Truth) — 버전 표기는 이 두 줄만 갱신하면
+  # 좌측 사이드바·footer·version-badge.html 등 모든 표시 위치에 자동 반영됨.
+  # 새 vX.Y.Z 릴리스 시 .claude-plugin/marketplace.json + plugin.json + SKILL.md 일괄 bump와 함께
+  # 반드시 이 두 줄을 동시에 갱신할 것 (feedback_version_bump_docs_checklist 참조).
+  version = "2.27.0"
+  releaseDate = "2026-06-19"
+  geekdocRepo = "https://github.com/modu-ai/cowork-plugins"
+  geekdocEditPath = "edit/main/docs-site/content"
+  geekdocSearch = true
+  geekdocSearchShowParent = true
+  geekdocLegalNotice = "https://github.com/modu-ai/cowork-plugins"
+  geekdocPrivacyPolicy = "/about/"
+  geekdocToC = 3
+  geekdocBreadcrumb = true
+  geekdocNextPrev = true
+  geekdocTagsToMenu = true
+  geekdocFileTreeSortBy = "weight"
+  geekdocCollapseSection = false
+  # 디자인 standalone 사이드바와 매칭: data/menu/main.yaml 기반 메뉴 사용
+  geekdocMenuBundle = true
+  # Mermaid 다이어그램 활성화 (flowchart, sequence, etc.)
+  geekdocMermaid = true
+
+  # 사이트 메타
+  description = "Claude Cowork와 cowork-plugins 17종의 한국어 사용자 가이드 · 베스트 프랙티스 · 쿡북"
+  author = "modu-ai"
+
+  # 라이트 모드 고정
+  geekdocDarkModeDefault = false
+  geekdocDarkModeToggle = false
+
+  # MoAI 브랜드 에셋
+  geekdocImage = "moai-logo.png"
+  # og:image 기본값 (1200x630, 페이지 frontmatter의 images 로 오버라이드 가능)
+  images = ["moai-cowork-og.png"]
+  [params.geekdocFontAwesome]
+    url = "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/css/all.min.css"
