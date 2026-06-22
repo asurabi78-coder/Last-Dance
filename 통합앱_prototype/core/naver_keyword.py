@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import time
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import pandas as pd
 import requests
@@ -14,6 +15,7 @@ from . import config
 SEARCHAD_BASE = "https://api.searchad.naver.com"
 SHOP_URL = "https://openapi.naver.com/v1/search/shop.json"
 TIMEOUT = 10
+SHOP_MAX_WORKERS = 4     # 쇼핑 상품수 동시 조회 수(rate limit 보호)
 
 # 점수 가중치(조정 가능)
 W_VOL, W_COMP, W_RATIO = 0.40, 0.30, 0.30
@@ -115,14 +117,24 @@ def enrich_with_shopping(df, top_n=15):
     if df is None or df.empty or not shopping_available():
         return df
     df = df.copy()
-    for i in df.head(top_n).index:
-        try:
-            cnt = shopping_total(df.at[i, "키워드"])
-            total = df.at[i, "월검색량"] or 0
-            df.at[i, "상품수"] = cnt
-            df.at[i, "경쟁률"] = round(cnt / total, 2) if total else None
-            df.at[i, "상품화점수"] = _full_score(total, df.at[i, "경쟁도"], cnt)
-            df.at[i, "등급"] = _grade(df.at[i, "상품화점수"])
-        except Exception:
+    idxs = list(df.head(top_n).index)
+    # 네트워크 호출(shopping_total)만 동시 처리. DataFrame 갱신은 메인 스레드에서 수행.
+    counts = {}
+    with ThreadPoolExecutor(max_workers=SHOP_MAX_WORKERS) as ex:
+        fut_to_idx = {ex.submit(shopping_total, df.at[i, "키워드"]): i for i in idxs}
+        for fut in as_completed(fut_to_idx):
+            i = fut_to_idx[fut]
+            try:
+                counts[i] = fut.result()
+            except Exception:
+                continue   # 실패 키워드는 건너뜀(기존 동작과 동일)
+    for i in idxs:
+        if i not in counts:
             continue
+        cnt = counts[i]
+        total = df.at[i, "월검색량"] or 0
+        df.at[i, "상품수"] = cnt
+        df.at[i, "경쟁률"] = round(cnt / total, 2) if total else None
+        df.at[i, "상품화점수"] = _full_score(total, df.at[i, "경쟁도"], cnt)
+        df.at[i, "등급"] = _grade(df.at[i, "상품화점수"])
     return df.sort_values("상품화점수", ascending=False).reset_index(drop=True)

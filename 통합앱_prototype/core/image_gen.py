@@ -1,11 +1,14 @@
 # -*- coding: utf-8 -*-
 """이미지 생성 — Gemini(나노바나나) 우선, 실패 시 OpenAI(gpt-image-1) 폴백 + remove.bg."""
 import base64
+from concurrent.futures import ThreadPoolExecutor
+
 import requests
 
 from . import config
 
 TIMEOUT = 120
+EXPAND_MAX_WORKERS = 3   # 장면 동시 생성 수(이미지 API 429/과금 보호)
 
 
 def available_gemini() -> bool:
@@ -90,7 +93,7 @@ def b64_to_bytes(b64: str) -> bytes:
 
 
 def fetch_image_bytes(url: str) -> bytes:
-    """원격 이미지 URL(도매꾹 대표이미지 등) → PNG 표준화 바이트. 편집 API 호환용."""
+    """원격 이미지 URL(도매꾹 대표이미지 등) -> PNG 표준화 바이트. 편집 API 호환용."""
     if not url:
         raise RuntimeError("이미지 URL이 비어있음")
     r = requests.get(url, timeout=TIMEOUT, headers={"User-Agent": "Mozilla/5.0"})
@@ -107,7 +110,7 @@ def fetch_image_bytes(url: str) -> bytes:
         im.save(out, format="PNG")
         return out.getvalue()
     except Exception:
-        return raw  # 변환 실패 시 원본 바이트 그대로
+        return raw
 
 
 def composite_on_white(image_bytes: bytes) -> bytes:
@@ -190,14 +193,20 @@ def edit_image(image_bytes, prompt, provider="auto"):
     raise RuntimeError(" / ".join(errors) or "사용 가능한 편집 엔진 없음")
 
 
+def _expand_one(image_bytes, scene, provider):
+    prompt = SCENE_PROMPTS.get(scene, scene)
+    try:
+        imgs, eng = edit_image(image_bytes, prompt, provider=provider)
+        return (scene, imgs[0], eng, None)
+    except Exception as e:
+        return (scene, None, None, str(e)[:120])
+
+
 def expand_from_reference(image_bytes, scenes, provider="auto"):
-    """선택한 장면들에 대해 변형 이미지 생성. [(scene, b64, engine|None, err|None)] 반환."""
-    results = []
-    for scene in scenes:
-        prompt = SCENE_PROMPTS.get(scene, scene)
-        try:
-            imgs, eng = edit_image(image_bytes, prompt, provider=provider)
-            results.append((scene, imgs[0], eng, None))
-        except Exception as e:
-            results.append((scene, None, None, str(e)[:120]))
-    return results
+    """선택한 장면들을 동시 생성. [(scene, b64, engine|None, err|None)] 입력 순서대로 반환."""
+    scenes = list(scenes)
+    if not scenes:
+        return []
+    with ThreadPoolExecutor(max_workers=EXPAND_MAX_WORKERS) as ex:
+        # map은 입력 순서대로 결과를 돌려줌 → 기존 반환 순서와 동일
+        return list(ex.map(lambda s: _expand_one(image_bytes, s, provider), scenes))

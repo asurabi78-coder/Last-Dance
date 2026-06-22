@@ -11,6 +11,7 @@ import requests
 from . import config
 
 TIMEOUT = 90
+COPY_MAX_TOKENS = 8000   # 13섹션 등 대용량 JSON 출력 잘림 방지
 
 
 def available_openai():
@@ -21,9 +22,10 @@ def available_anthropic():
     return config.present("ANTHROPIC_API_KEY")
 
 
-def _chat(messages, provider, max_tokens=2200, json_mode=True):
+def _chat_one(messages, provider, max_tokens=2200, json_mode=True):
+    """단일 provider 호출(폴백 없음)."""
     if provider == "anthropic":
-        body = {"model": config.get("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022"),
+        body = {"model": config.get("ANTHROPIC_MODEL", "claude-sonnet-4-6"),
                 "max_tokens": max_tokens,
                 "system": messages[0]["content"],
                 "messages": [{"role": "user", "content": messages[1]["content"]}]}
@@ -44,6 +46,25 @@ def _chat(messages, provider, max_tokens=2200, json_mode=True):
     if r.status_code != 200:
         raise RuntimeError(f"OpenAI {r.status_code}: {r.text[:160]}")
     return r.json()["choices"][0]["message"]["content"]
+
+
+def _chat(messages, provider, max_tokens=2200, json_mode=True):
+    """선택 엔진 우선 호출 → 실패 시 다른 엔진으로 자동 폴백.
+    provider='anthropic'이면 [anthropic→openai], 그 외 [openai→anthropic] 순서."""
+    order = ["anthropic", "openai"] if provider == "anthropic" else ["openai", "anthropic"]
+    errors = []
+    for pv in order:
+        if pv == "openai" and not available_openai():
+            continue
+        if pv == "anthropic" and not available_anthropic():
+            continue
+        try:
+            return _chat_one(messages, pv, max_tokens=max_tokens, json_mode=json_mode)
+        except Exception as e:
+            errors.append(f"{pv}: {str(e)[:120]}")
+    if errors:
+        raise RuntimeError("카피 LLM 모두 실패 → " + " / ".join(errors))
+    raise RuntimeError("사용 가능한 카피 LLM 없음(키 미설정)")
 
 
 def _parse_json(text):
@@ -104,7 +125,7 @@ def generate_13(product, keyword, features="", target="", provider="openai"):
     user = USER_13.format(product=product, keyword=keyword,
                           features=features or "-", target=target or "일반 소비자")
     data = _parse_json(_chat([{"role": "system", "content": SYSTEM_13},
-                              {"role": "user", "content": user}], provider))
+                              {"role": "user", "content": user}], provider, max_tokens=COPY_MAX_TOKENS))
     # 섹션 정규화: 순서 보장 + 누락 채움
     by_key = {}
     for sec in data.get("sections", []):
@@ -138,7 +159,7 @@ def humanize(copy_dict, provider="openai"):
     user = "다음 JSON의 텍스트를 위 규칙대로 윤문해 같은 구조 JSON으로 반환:\n" + json.dumps(copy_dict, ensure_ascii=False)
     try:
         out = _parse_json(_chat([{"role": "system", "content": SYSTEM_HUMAN},
-                                 {"role": "user", "content": user}], provider, max_tokens=2600))
+                                 {"role": "user", "content": user}], provider, max_tokens=COPY_MAX_TOKENS))
         out["provider"] = copy_dict.get("provider", provider)
         # 섹션 구조가 깨졌으면 원본 유지
         if "sections" in copy_dict and len(out.get("sections", [])) != len(copy_dict["sections"]):

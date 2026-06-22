@@ -11,7 +11,8 @@ import random
 import pandas as pd
 import streamlit as st
 
-from core import config, naver_keyword, sourcing, copy_gpt, image_gen, detail_template, datalab_rank
+from concurrent.futures import ThreadPoolExecutor
+from core import config, naver_keyword, sourcing, copy_gpt, image_gen, detail_template, datalab_rank, store, batch, commerce
 import streamlit.components.v1 as components
 
 st.set_page_config(page_title="스마트스토어 통합 웹앱", page_icon="🛒", layout="wide")
@@ -70,7 +71,7 @@ with st.sidebar:
 
 st.title("🛒 스마트스토어 통합 웹앱")
 st.caption("키워드 → 소싱 → 상세페이지 → 이미지")
-t1, t2, t3, t4 = st.tabs(["① 키워드", "② 소싱", "③ 상세페이지", "④ 이미지"])
+t1, t2, t3, t4, t5 = st.tabs(["① 키워드", "② 소싱", "③ 상세페이지", "④ 이미지", "📦 배치 & 저장함"])
 
 # ----- ① 키워드
 with t1:
@@ -206,7 +207,7 @@ with t2:
                         _trow = sdf[sdf["상품후보"] == pick]
                         _tthumb = str(_trow.iloc[0].get("썸네일") or "") if not _trow.empty else ""
                         st.session_state["sourcing_pick"] = {"keyword": kw, "product": pick, "thumb": _tthumb}
-                        st.success(f"선택: {pick} → ③ 상세페이지" + (" (대표이미지 가져옴)" if _tthumb else ""))
+                        st.success(f"선택: {pick} → ③ 상세페이지" + (" (대표이미지 가져온)" if _tthumb else ""))
                 else:
                     def _badge(sc):
                         return "🟢 A" if sc >= 70 else ("🟡 B" if sc >= 45 else "⚪ C")
@@ -235,7 +236,7 @@ with t2:
                                 st.caption(f"사입 {int(row['사입원가']):,} → 판매 {int(row['예상판매가']):,}")
                                 if st.button("이 상품으로 →", key=f"pick_{r0+j}"):
                                     st.session_state["sourcing_pick"] = {"keyword": kw, "product": title, "thumb": str(row.get("썸네일") or "")}
-                                    st.success("선택됨 → ③ 상세페이지" + (" (대표이미지 가져옴)" if str(row.get("썸네일") or "") else ""))
+                                    st.success("선택됨 → ③ 상세페이지" + (" (대표이미지 가져온)" if str(row.get("썸네일") or "") else ""))
 
 # ----- ③ 상세페이지
 with t3:
@@ -267,46 +268,59 @@ with t3:
     if st.button("상세페이지 생성", type="primary"):
         ok = (provider == "openai" and copy_gpt.available_openai()) or \
              (provider == "anthropic" and copy_gpt.available_anthropic())
-        cr = None
-        if use_real and ok:
-            try:
-                if mode_13:
-                    cr = copy_gpt.generate_13(pr_in or "상품", kw_in or "키워드", features=feat, provider=provider)
+
+        def _make_hero():
+            """대표이미지 작업(별도 스레드). (hero_dataurl, engine, warn) 반환. st.* 호출 금지."""
+            if not (include_img and use_real and
+                    (image_gen.available_gemini() or image_gen.available_openai())):
+                return "", "", None
+            imgs, eng, warn = None, None, None
+            if use_thumb_img and _sp_thumb:
+                try:
+                    ref = image_gen.fetch_image_bytes(_sp_thumb)
+                    imgs, _e = image_gen.edit_image(ref, image_gen.SCENE_PROMPTS["흰배경 메인컷"])
+                    eng = "도매꾹기반·" + _e
+                except Exception as e:
+                    warn = f"도매꾹 이미지 기반 작업 실패 → 대체 생성 시도: {e}"
+                    imgs, eng = None, None
+            if not imgs:
+                try:
+                    ip = f"Studio e-commerce hero shot of {pr_in or kw_in}, clean white background, photorealistic, 1:1"
+                    imgs, eng = image_gen.generate_image(ip)
+                except Exception as e:
+                    warn = (warn + " / " if warn else "") + f"대표이미지 생성 실패: {e}"
+                    imgs = None
+            if imgs:
+                return "data:image/png;base64," + imgs[0], eng, None
+            return "", "", warn
+
+        with st.spinner("상세페이지 생성 중… (카피와 대표이미지를 동시에 처리합니다)"):
+            with ThreadPoolExecutor(max_workers=1) as _ex:
+                _hero_fut = _ex.submit(_make_hero)   # 이미지 백그라운드 시작(카피와 동시 진행)
+                cr = None
+                if use_real and ok:
+                    try:
+                        if mode_13:
+                            cr = copy_gpt.generate_13(pr_in or "상품", kw_in or "키워드", features=feat, provider=provider)
+                        else:
+                            cr = copy_gpt.generate(pr_in or "상품", kw_in or "키워드", features=feat, provider=provider)
+                        if do_human:
+                            cr = copy_gpt.humanize(cr, provider=provider)
+                    except Exception as e:
+                        st.error(f"카피 생성 실패: {e}")
                 else:
-                    cr = copy_gpt.generate(pr_in or "상품", kw_in or "키워드", features=feat, provider=provider)
-                if do_human:
-                    cr = copy_gpt.humanize(cr, provider=provider)
-            except Exception as e:
-                st.error(f"카피 생성 실패: {e}")
-        else:
-            cr = {"provider": "모의", "title": f"{kw_in} {pr_in} 가성비 추천",
-                  "bullets": ["핵심 기능 요약", "흡한속건·가벼움", "남녀공용", "합리적 가격"],
-                  "body": "(모의 문구) 실데이터 사용을 켜고 키를 넣으면 GPT가 생성합니다.",
-                  "tags": [kw_in, pr_in, "가성비", "기능성"], "image_brief": ["메인컷", "디테일컷"]}
+                    cr = {"provider": "모의", "title": f"{kw_in} {pr_in} 가성비 추천",
+                          "bullets": ["핵심 기능 요약", "흡한속건·가벼움", "남녀공용", "합리적 가격"],
+                          "body": "(모의 문구) 실데이터 사용을 켜고 키를 넣으면 GPT가 생성합니다.",
+                          "tags": [kw_in, pr_in, "가성비", "기능성"], "image_brief": ["메인컷", "디테일컷"]}
+                hero_url, hero_eng, hero_warn = _hero_fut.result()
+
+        if hero_warn:
+            st.warning(hero_warn)
         if cr is not None:
-            cr["hero"] = ""
-            if include_img and use_real and (image_gen.available_gemini() or image_gen.available_openai()):
-                imgs, eng = None, None
-                # 1) 도매꾹 대표이미지 기반(권장): 실제 상품 유지한 채 흰배경 메인컷으로 가공
-                if use_thumb_img and _sp_thumb:
-                    try:
-                        ref = image_gen.fetch_image_bytes(_sp_thumb)
-                        imgs, _e = image_gen.edit_image(ref, image_gen.SCENE_PROMPTS["흰배경 메인컷"])
-                        eng = "도매꾹기반·" + _e
-                    except Exception as e:
-                        st.warning(f"도매꾹 이미지 기반 작업 실패 → 텍스트 생성으로 대체: {e}")
-                        imgs, eng = None, None
-                # 2) 폴백: 텍스트로 새 이미지 생성
-                if not imgs:
-                    try:
-                        ip = f"Studio e-commerce hero shot of {pr_in or kw_in}, clean white background, photorealistic, 1:1"
-                        imgs, eng = image_gen.generate_image(ip)
-                    except Exception as e:
-                        st.warning(f"대표이미지 생성 실패 → 자리표시로 대체: {e}")
-                        imgs = None
-                if imgs:
-                    cr["hero"] = "data:image/png;base64," + imgs[0]
-                    cr["hero_engine"] = eng
+            cr["hero"] = hero_url or ""
+            if hero_url:
+                cr["hero_engine"] = hero_eng
             st.session_state["copy_result"] = cr
     cr = st.session_state.get("copy_result")
     if cr:
@@ -329,6 +343,14 @@ with t3:
                                                          meta={"상품명": pr_in or cr.get("title", "")})
             components.html(page, height=1000, scrolling=True)
             st.download_button("상세페이지 HTML 다운로드", page.encode("utf-8"), "상세페이지.html", "text/html")
+            if st.button("💾 이 상세페이지 저장", key="save_detail_btn"):
+                try:
+                    _sid = store.save_detail(cr, html=page,
+                                             meta={"상품명": pr_in or cr.get("title", ""), "키워드": kw_in},
+                                             hero=cr.get("hero"))
+                    st.success(f"저장됨: {_sid}  ·  '📦 배치 & 저장함' 탭에서 확인하세요.")
+                except Exception as _e:
+                    st.error(f"저장 실패: {_e}")
         except Exception as e:
             st.error(f"상세페이지 렌더 실패: {e}")
         with st.expander("텍스트(카피)만 보기"):
@@ -443,3 +465,106 @@ with t4:
             svg = "<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><rect width='100%' height='100%' fill='#f0f0f0'/><text x='50%' y='50%' text-anchor='middle' fill='#888'>MOCK IMAGE</text></svg>"
             st.image("data:image/svg+xml;utf8," + svg)
     st.caption("제품 본컷은 실사 권장 · AI는 연출/배경/인포그래픽 용도")
+
+
+# ----- 5 배치 & 저장함
+def _safe_rerun():
+    fn = getattr(st, "rerun", None) or getattr(st, "experimental_rerun", None)
+    if fn:
+        fn()
+
+with t5:
+    st.subheader("📦 배치 & 저장함")
+    st.markdown("#### 여러 개 연속 생성 (배치)")
+    _batch_items = []
+    _sdf = st.session_state.get("src_df")
+    if _sdf is not None and not _sdf.empty and "상품후보" in _sdf.columns:
+        _sel_a = st.multiselect("② 소싱 결과에서 선택", _sdf["상품후보"].tolist(), key="batch_src_sel")
+        _bkw = st.session_state.get("sourcing_seed") or (st.session_state.get("kw_selected") or [""])[0]
+        for _name in _sel_a:
+            _r = _sdf[_sdf["상품후보"] == _name]
+            _thumb = str(_r.iloc[0].get("썸네일") or "") if not _r.empty else ""
+            _batch_items.append({"키워드": _bkw, "상품명": _name, "썸네일": _thumb})
+    else:
+        st.caption("② 소싱 검색을 먼저 하면 결과에서 골라 배치에 넣을 수 있습니다.")
+    _manual = st.text_area("수동 목록 (한 줄당:  키워드 | 상품명 | 특징)", height=110,
+                           placeholder="여름양말 | 시스루 발목양말 | 통기성\n14K귀걸이 | 데일리 링귀걸이",
+                           key="batch_manual")
+    _batch_items = _batch_items + batch.parse_manual(_manual)
+    _bo1, _bo2, _bo3, _bo4 = st.columns(4)
+    _b_13 = _bo1.checkbox("13섹션", value=True, key="b_mode13")
+    _b_hu = _bo2.checkbox("문체정리", value=False, key="b_human")
+    _b_img = _bo3.checkbox("대표이미지", value=False, key="b_img")
+    _b_workers = _bo4.slider("동시 워커", 1, 3, 2, key="b_workers")
+    st.caption(f"생성 대기 항목: {len(_batch_items)}건  ·  LLM: {'Claude' if provider == 'anthropic' else 'GPT'}  ·  실패는 건너뜀")
+    if st.button("🚀 일괄 생성", type="primary", key="batch_run"):
+        if not _batch_items:
+            st.warning("생성할 항목이 없습니다. ② 선택 또는 수동 목록을 입력하세요.")
+        elif not use_real:
+            st.warning("실데이터 사용(API 호출)이 꺼져 있습니다. 사이드바에서 켜주세요.")
+        else:
+            with st.spinner(f"{len(_batch_items)}건 일괄 생성 중… (동시 {_b_workers}개)"):
+                _results = batch.run_batch(_batch_items,
+                    opts={"mode_13": _b_13, "do_human": _b_hu, "include_img": _b_img,
+                          "use_thumb_img": True, "save": True, "provider": provider},
+                    max_workers=_b_workers)
+            _okc = sum(1 for _r in _results if _r["status"] == "ok")
+            st.success(f"완료: 성공 {_okc} / 실패 {len(_results) - _okc}  ·  저장함에 추가됨")
+            for _r in _results:
+                if _r["status"] == "ok":
+                    st.markdown(f"- ✅ **{_r['title']}**  ·  저장 id `{_r['id']}`")
+                else:
+                    st.markdown(f"- ❌ {_r.get('product') or _r.get('keyword') or '(이름없음)'}  ·  {_r.get('error')}")
+    st.divider()
+    st.markdown("#### 저장함")
+    _saved = store.list_saved()
+    if not _saved:
+        st.info("아직 저장된 상세페이지가 없습니다. ③에서 '💾 이 상세페이지 저장'을 눌러 보관하세요.")
+    else:
+        st.caption(f"총 {len(_saved)}건 (최신순)")
+        for _it in _saved:
+            _icon = "🖼️" if _it["has_image"] else "📄"
+            with st.expander(f"{_icon} {_it['title']}  ·  {_it['created']}"):
+                st.caption(f"키워드: {_it.get('keyword','') or '-'}  |  id: {_it['id']}")
+                _d = store.load_detail(_it["id"])
+                bcol1, bcol2, bcol3 = st.columns([1, 1, 1])
+                if bcol1.button("미리보기", key=f"prev_{_it['id']}"):
+                    if _d and _d.get("html"):
+                        components.html(_d["html"], height=600, scrolling=True)
+                    else:
+                        st.info("저장된 HTML이 없습니다.")
+                if _d and _d.get("html"):
+                    bcol2.download_button("HTML 다운로드", _d["html"].encode("utf-8"),
+                                          f"{_it['id']}.html", "text/html", key=f"dl_{_it['id']}")
+                if bcol3.button("🗑 삭제", key=f"del_{_it['id']}"):
+                    if store.delete_detail(_it["id"]):
+                        st.success("삭제됨.")
+                        _safe_rerun()
+                    else:
+                        st.error("삭제 실패")
+                with st.expander("🛒 스마트스토어 임시저장 업로드 (미리보기)"):
+                    if not commerce.available():
+                        st.caption("커머스API 키(NAVER_COMMERCE_*)가 없어 업로드를 사용할 수 없습니다.")
+                    else:
+                        _uc1, _uc2, _uc3 = st.columns(3)
+                        _u_cat = _uc1.text_input("카테고리코드", key=f"cat_{_it['id']}", placeholder="예: 50000167")
+                        _u_price = _uc2.number_input("판매가(원)", min_value=0, step=100, value=0, key=f"price_{_it['id']}")
+                        _u_stock = _uc3.number_input("재고", min_value=0, step=1, value=100, key=f"stock_{_it['id']}")
+                        _has_img = bool(_d and _d.get("hero_path"))
+                        _u_inp = {
+                            "name": _it["title"],
+                            "leafCategoryId": _u_cat,
+                            "salePrice": _u_price,
+                            "stockQuantity": _u_stock,
+                            "detailContent": (_d or {}).get("html", ""),
+                            "representativeImageUrl": "(전송 시 자동 업로드)" if _has_img else "",
+                        }
+                        if st.button("미리보기(dry-run)", key=f"dry_{_it['id']}"):
+                            _miss = commerce.validate_inputs(_u_inp)
+                            if _miss:
+                                st.warning("입력/준비 필요: " + ", ".join(_miss))
+                            else:
+                                _payload = commerce.build_payload(_u_inp, status_type="WAIT")
+                                st.success("등록 페이로드 미리보기 — 실제 전송 안 함 (statusType=WAIT, 판매대기)")
+                                st.json(_payload)
+                        st.caption("※ 실제 업로드(3b)는 PC에서 실키로 검증 후 활성화됩니다. 지금은 미리보기 전용입니다.")

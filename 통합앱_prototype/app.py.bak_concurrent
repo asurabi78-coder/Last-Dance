@@ -1,0 +1,443 @@
+# -*- coding: utf-8 -*-
+"""
+스마트스토어 통합 웹앱 — Phase 2 (실제 API 연동 + 실패 시 모의 폴백)
+흐름: 키워드 분석 → 소싱 → 상세페이지 → 이미지
+실데이터: 네이버 검색광고 / 도매꾹 / OpenAI(GPT) / Gemini + remove.bg
+※ 외부 통신이 막힌 환경에서는 각 단계가 자동으로 '모의'로 폴백합니다.
+"""
+import os
+import random
+
+import pandas as pd
+import streamlit as st
+
+from core import config, naver_keyword, sourcing, copy_gpt, image_gen, detail_template, datalab_rank
+import streamlit.components.v1 as components
+
+st.set_page_config(page_title="스마트스토어 통합 웹앱", page_icon="🛒", layout="wide")
+
+KEYS = ["NAVER_AD_ACCESS_LICENSE", "NAVER_AD_SECRET_KEY", "NAVER_AD_CUSTOMER_ID",
+        "NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET", "OPENAI_API_KEY", "ANTHROPIC_API_KEY",
+        "GEMINI_API_KEY", "REMOVE_BG_API_KEY", "DOMEGGOOK_API_KEY",
+        "NAVER_COMMERCE_CLIENT_ID", "NAVER_COMMERCE_CLIENT_SECRET"]
+
+CATEGORIES = ["(선택 안 함)", "패션의류", "패션잡화", "화장품/미용", "디지털/가전",
+              "가구/인테리어", "출산/육아", "식품", "스포츠/레저", "생활/건강",
+              "여가/생활편의", "반려동물", "문구/오피스", "자동차용품"]
+
+
+def ss(k, v):
+    if k not in st.session_state:
+        st.session_state[k] = v
+
+
+ss("kw_selected", [])
+ss("sourcing_pick", None)
+ss("copy_result", None)
+
+
+def mock_keywords(seed):
+    base = (seed or "키워드").strip()
+    random.seed(base)
+    rows = []
+    for v in [base, base + " 추천", base + " 남자", base + " 여성", base + " 세트",
+              base + " 가성비", "기능성 " + base, base + " 정품"]:
+        vol = random.randint(800, 60000)
+        comp = random.choice(["낮음", "중간", "높음"])
+        cs = {"낮음": 0.2, "중간": 0.5, "높음": 0.85}[comp]
+        cnt = random.randint(500, 800000)
+        score = round(100 * (vol/60000) * (1-cs)**0.5, 1)
+        grade = "A" if score >= 70 else ("B" if score >= 45 else "C")
+        rows.append({"키워드": v, "월검색량": vol, "경쟁도": comp,
+                     "상품수": cnt, "경쟁률": round(cnt/vol, 2),
+                     "상품화점수": score, "등급": grade})
+    return pd.DataFrame(rows).sort_values("상품화점수", ascending=False).reset_index(drop=True)
+
+
+# ----- 사이드바
+with st.sidebar:
+    st.header("⚙️ 설정")
+    present = [k for k in KEYS if config.present(k)]
+    st.caption(f".env 키 감지: {len(present)}/{len(KEYS)} (값 비공개)")
+    with st.expander("키 상태"):
+        for k in KEYS:
+            st.write(("✅ " if config.present(k) else "⬜ ") + k)
+    provider = "openai" if st.radio("상세페이지 LLM", ["GPT (OpenAI)", "Claude (Anthropic)"],
+                                    index=0) == "GPT (OpenAI)" else "anthropic"
+    use_real = st.toggle("실데이터 사용(API 호출)", value=True,
+                         help="끄면 모든 단계가 모의 데이터로 동작합니다.")
+    st.caption("외부 통신이 막힌 환경이면 자동으로 모의 폴백됩니다.")
+
+st.title("🛒 스마트스토어 통합 웹앱")
+st.caption("키워드 → 소싱 → 상세페이지 → 이미지")
+t1, t2, t3, t4 = st.tabs(["① 키워드", "② 소싱", "③ 상세페이지", "④ 이미지"])
+
+# ----- ① 키워드
+with t1:
+    st.subheader("① 키워드 자동 분석")
+    cc, ck = st.columns([1, 2])
+    category = cc.selectbox("카테고리(선택)", CATEGORIES, index=0)
+    seed = ck.text_input("카테고리/키워드", placeholder="예: 로카티")
+    if st.button("키워드 분석", type="primary"):
+        hint = (seed or "").strip() or ("" if category == "(선택 안 함)" else category)
+        if use_real and naver_keyword.available():
+            try:
+                df = naver_keyword.related_keywords(hint)
+                df = naver_keyword.enrich_with_shopping(df)   # 상품수·경쟁률·등급 보강
+                st.session_state["kw_df"] = df
+                st.session_state["kw_src"] = "네이버 검색광고+쇼핑 API"
+            except Exception as e:
+                st.warning(f"실데이터 실패 → 모의로 대체: {e}")
+                st.session_state["kw_df"] = mock_keywords(hint)
+                st.session_state["kw_src"] = "모의(폴백)"
+        else:
+            st.session_state["kw_df"] = mock_keywords(hint)
+            st.session_state["kw_src"] = "모의"
+    if "kw_df" in st.session_state:
+        st.caption("출처: " + st.session_state.get("kw_src", ""))
+        df = st.session_state["kw_df"]
+        if not df.empty:
+            edf = df.copy()
+            edf.insert(0, "선택", False)
+            edited = st.data_editor(
+                edf, use_container_width=True, hide_index=True, key="kw_editor",
+                column_config={"선택": st.column_config.CheckboxColumn("선택", default=False)},
+                disabled=[c for c in edf.columns if c != "선택"])
+            checked = edited[edited["선택"]]["키워드"].astype(str).tolist()
+            st.caption("체크: " + (", ".join(checked) if checked else "없음"))
+            if st.button("✅ 선택 키워드 → ② 소싱", key="kw_to_src", type="primary"):
+                if checked:
+                    st.session_state["kw_selected"] = checked
+                    st.session_state["sourcing_seed"] = checked[0]
+                    st.success(f"{', '.join(checked)} → ② 소싱으로 전달됨 (② 탭으로 이동)")
+                else:
+                    st.warning("표에서 키워드를 체크하세요.")
+        else:
+            st.dataframe(df, use_container_width=True)
+
+    with st.expander("🔥 분야별 인기검색어 TOP (데이터랩)", expanded=False):
+        dcat = st.selectbox("분야 선택", datalab_rank.categories(), key="dl_cat")
+        if st.button("인기검색어 가져오기", key="dl_btn"):
+            if use_real:
+                drows, dsrc = datalab_rank.get_top(dcat, count=20)
+            else:
+                drows, dsrc = [], "실데이터 OFF"
+            st.session_state["dl_rows"] = drows
+            st.session_state["dl_src"] = dsrc
+        if "dl_rows" in st.session_state:
+            st.caption("출처: " + st.session_state.get("dl_src", ""))
+            drows = st.session_state["dl_rows"]
+            if drows:
+                ddf = pd.DataFrame(drows)
+                ddf.insert(0, "선택", False)
+                dedit = st.data_editor(
+                    ddf, use_container_width=True, hide_index=True, key="dl_editor",
+                    column_config={"선택": st.column_config.CheckboxColumn("선택", default=False)},
+                    disabled=[c for c in ddf.columns if c != "선택"])
+                dchecked = dedit[dedit["선택"]]["키워드"].astype(str).tolist()
+                if st.button("✅ 선택 키워드 → ② 소싱", key="dl_use", type="primary"):
+                    if dchecked:
+                        st.session_state["kw_selected"] = dchecked
+                        st.session_state["sourcing_seed"] = dchecked[0]
+                        st.success(f"{', '.join(dchecked)} → ② 소싱으로 전달됨")
+                    else:
+                        st.warning("표에서 키워드를 체크하세요.")
+        st.caption("비공식 데이터랩 소스라 네이버 변경 시 안 될 수 있음(개인용).")
+
+    with st.expander("🏷️ 상품명 3안 · 해시태그 생성", expanded=False):
+        nkw = st.text_input("키워드/상품", value=(st.session_state.get("kw_selected") or [""])[0], key="nm_kw")
+        nfeat = st.text_input("특징(쉼표)", key="nm_feat")
+        nbrand = st.text_input("브랜드(선택)", key="nm_brand")
+        if st.button("상품명 생성", key="nm_btn"):
+            if use_real and (copy_gpt.available_openai() or copy_gpt.available_anthropic()):
+                try:
+                    st.session_state["name_res"] = copy_gpt.product_names(
+                        nkw or "상품", features=nfeat, brand=nbrand, provider=provider)
+                except Exception as e:
+                    st.error(f"상품명 생성 실패: {e}")
+            else:
+                st.info("실데이터 OFF 또는 LLM 키 없음")
+        nd = st.session_state.get("name_res")
+        if nd:
+            for it in nd.get("names", []):
+                v = it.get("검증", {})
+                flag = "✅" if v.get("통과") else "⚠️"
+                st.markdown(f"{flag} **[{it.get('유형','')}]** {it.get('상품명','')}")
+                warn = []
+                if v.get("권장초과(50)"):
+                    warn.append(f"50자 초과({v.get('길이')}자)")
+                if v.get("금지어"):
+                    warn.append("금지어: " + ", ".join(v["금지어"]))
+                st.caption(("⚠️ " + " · ".join(warn)) if warn else f"{v.get('길이')}자 · 통과")
+            if nd.get("hashtags"):
+                st.markdown("**해시태그:** " + " ".join("#" + str(h) for h in nd["hashtags"]))
+            if nd.get("blog_titles"):
+                st.markdown("**블로그 제목:** " + " / ".join(nd["blog_titles"]))
+
+# ----- ② 소싱
+with t2:
+    st.subheader("② 공급처 소싱")
+    sel = st.session_state.get("kw_selected", [])
+    if True:
+        if sel:
+            st.caption("①에서 선택된 키워드: " + ", ".join(map(str, sel)))
+        _seed = st.session_state.get("sourcing_seed") or (sel[0] if sel else "")
+        kw = st.text_input("소싱 키워드 (직접 입력 가능)", value=_seed,
+                           placeholder="예: 귀걸이 보관함")
+        if st.button("소싱 후보 검색", type="primary"):
+            if use_real:
+                rows, real = sourcing.search(kw)
+            else:
+                rows, real = sourcing._mock(kw), False
+            st.session_state["src_df"] = pd.DataFrame(rows)
+            st.session_state["src_real"] = real
+        if "src_df" in st.session_state:
+            st.caption("출처: " + ("도매꾹 API" if st.session_state.get("src_real") else "모의(폴백)"))
+            sdf = st.session_state["src_df"]
+            if not sdf.empty:
+                view = st.radio("보기", ["카드", "표"], horizontal=True, key="src_view")
+                if view == "표":
+                    st.dataframe(sdf, use_container_width=True, column_config={
+                        "썸네일": st.column_config.ImageColumn("이미지"),
+                        "링크": st.column_config.LinkColumn("링크", display_text="상품보기"),
+                    })
+                    pick = st.selectbox("상세페이지로 넘길 후보", sdf["상품후보"].tolist())
+                    if st.button("이 후보 선택", key="pick_tbl"):
+                        _trow = sdf[sdf["상품후보"] == pick]
+                        _tthumb = str(_trow.iloc[0].get("썸네일") or "") if not _trow.empty else ""
+                        st.session_state["sourcing_pick"] = {"keyword": kw, "product": pick, "thumb": _tthumb}
+                        st.success(f"선택: {pick} → ③ 상세페이지" + (" (대표이미지 가져온)" if _tthumb else ""))
+                else:
+                    def _badge(sc):
+                        return "🟢 A" if sc >= 70 else ("🟡 B" if sc >= 45 else "⚪ C")
+                    rows = sdf.head(12).reset_index(drop=True)
+                    ncol = 3
+                    for r0 in range(0, len(rows), ncol):
+                        cols = st.columns(ncol)
+                        for j in range(ncol):
+                            if r0 + j >= len(rows):
+                                break
+                            row = rows.iloc[r0 + j]
+                            with cols[j]:
+                                thumb = str(row.get("썸네일") or "")
+                                if thumb:
+                                    st.image(thumb, use_container_width=True)
+                                else:
+                                    st.markdown("<div style='height:130px;background:#f0f0f0;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#aaa'>이미지 없음</div>", unsafe_allow_html=True)
+                                title = str(row["상품후보"])
+                                link = str(row.get("링크") or "")
+                                sc = float(row.get("점수") or 0)
+                                if link:
+                                    st.markdown(f"**[{title[:38]}]({link})**")
+                                else:
+                                    st.markdown(f"**{title[:38]}**")
+                                st.caption(f"{_badge(sc)} · 점수 {sc} · 마진 +{int(row['예상마진']):,}원")
+                                st.caption(f"사입 {int(row['사입원가']):,} → 판매 {int(row['예상판매가']):,}")
+                                if st.button("이 상품으로 →", key=f"pick_{r0+j}"):
+                                    st.session_state["sourcing_pick"] = {"keyword": kw, "product": title, "thumb": str(row.get("썸네일") or "")}
+                                    st.success("선택됨 → ③ 상세페이지" + (" (대표이미지 가져온)" if str(row.get("썸네일") or "") else ""))
+
+# ----- ③ 상세페이지
+with t3:
+    st.subheader("③ 상세페이지 카피")
+    sp = st.session_state.get("sourcing_pick")
+    dkw = sp["keyword"] if sp else (st.session_state.get("kw_selected") or [""])[0]
+    dpr = sp["product"] if sp else ""
+    c1, c2 = st.columns(2)
+    kw_in = c1.text_input("키워드", value=dkw)
+    pr_in = c2.text_input("상품명", value=dpr, placeholder="예: DMPS 로카티 쿨드라이 반팔티")
+    feat = st.text_input("핵심 특징(쉼표)", placeholder="쿨드라이, 남녀공용, ROKA 디테일")
+    o1, o2, o3 = st.columns(3)
+    mode_13 = o1.checkbox("13섹션 감정여정", value=True, help="Hero→Pain→…→CTA 13섹션 고전환 구조")
+    do_human = o2.checkbox("문체 정리(humanize)", value=True, help="번역투·AI관용구 제거(호출 1회 추가)")
+    include_img = o3.checkbox("AI 대표이미지(B)", value=True, help="상단 대표이미지 생성(과금)")
+    _sp_thumb = (sp or {}).get("thumb") if sp else ""
+    if _sp_thumb:
+        tc1, tc2 = st.columns([1, 4])
+        try:
+            tc1.image(_sp_thumb, width=110)
+        except Exception:
+            tc1.caption("(미리보기 불가)")
+        use_thumb_img = tc2.checkbox("도매꾹 대표이미지 기반으로 AI 작업(권장)", value=True,
+                                     help="새로 그리지 않고, 선택한 실제 상품 사진을 유지한 채 흰배경 메인컷으로 가공합니다.")
+        tc2.caption("② 소싱에서 선택한 상품의 대표이미지를 가져왔습니다. (실패 시 텍스트 생성으로 자동 폴백)")
+    else:
+        use_thumb_img = False
+        st.caption("ℹ️ ② 소싱에서 상품을 선택하면 대표이미지를 가져와 AI가 그 사진으로 작업합니다. (지금은 텍스트 생성)")
+    if st.button("상세페이지 생성", type="primary"):
+        ok = (provider == "openai" and copy_gpt.available_openai()) or \
+             (provider == "anthropic" and copy_gpt.available_anthropic())
+        cr = None
+        if use_real and ok:
+            try:
+                if mode_13:
+                    cr = copy_gpt.generate_13(pr_in or "상품", kw_in or "키워드", features=feat, provider=provider)
+                else:
+                    cr = copy_gpt.generate(pr_in or "상품", kw_in or "키워드", features=feat, provider=provider)
+                if do_human:
+                    cr = copy_gpt.humanize(cr, provider=provider)
+            except Exception as e:
+                st.error(f"카피 생성 실패: {e}")
+        else:
+            cr = {"provider": "모의", "title": f"{kw_in} {pr_in} 가성비 추천",
+                  "bullets": ["핵심 기능 요약", "흡한속건·가벼움", "남녀공용", "합리적 가격"],
+                  "body": "(모의 문구) 실데이터 사용을 켜고 키를 넣으면 GPT가 생성합니다.",
+                  "tags": [kw_in, pr_in, "가성비", "기능성"], "image_brief": ["메인컷", "디테일컷"]}
+        if cr is not None:
+            cr["hero"] = ""
+            if include_img and use_real and (image_gen.available_gemini() or image_gen.available_openai()):
+                imgs, eng = None, None
+                if use_thumb_img and _sp_thumb:
+                    try:
+                        ref = image_gen.fetch_image_bytes(_sp_thumb)
+                        imgs, _e = image_gen.edit_image(ref, image_gen.SCENE_PROMPTS["흰배경 메인컷"])
+                        eng = "도매꾹기반·" + _e
+                    except Exception as e:
+                        st.warning(f"도매꾹 이미지 기반 작업 실패 → 텍스트 생성으로 대체: {e}")
+                        imgs, eng = None, None
+                if not imgs:
+                    try:
+                        ip = f"Studio e-commerce hero shot of {pr_in or kw_in}, clean white background, photorealistic, 1:1"
+                        imgs, eng = image_gen.generate_image(ip)
+                    except Exception as e:
+                        st.warning(f"대표이미지 생성 실패 → 자리표시로 대체: {e}")
+                        imgs = None
+                if imgs:
+                    cr["hero"] = "data:image/png;base64," + imgs[0]
+                    cr["hero_engine"] = eng
+            st.session_state["copy_result"] = cr
+    cr = st.session_state.get("copy_result")
+    if cr:
+        tag = cr.get("provider", "")
+        if cr.get("humanized"):
+            tag += " · 문체정리✓"
+        if cr.get("hero"):
+            tag += f" · 이미지 {cr.get('hero_engine','')}"
+        st.caption("생성: " + tag)
+        try:
+            sec_imgs = st.session_state.get("section_images") or {}
+            if sec_imgs:
+                st.caption(f"④에서 만든 구간 이미지 {len(sec_imgs)}장 자동 배치됨")
+            if cr.get("sections"):
+                page = detail_template.build_detail_html_13(cr, hero_img=cr.get("hero", ""),
+                                                            meta={"상품명": pr_in or cr.get("title", "")},
+                                                            section_images=sec_imgs)
+            else:
+                page = detail_template.build_detail_html(cr, hero_img=cr.get("hero", ""),
+                                                         meta={"상품명": pr_in or cr.get("title", "")})
+            components.html(page, height=1000, scrolling=True)
+            st.download_button("상세페이지 HTML 다운로드", page.encode("utf-8"), "상세페이지.html", "text/html")
+        except Exception as e:
+            st.error(f"상세페이지 렌더 실패: {e}")
+        with st.expander("텍스트(카피)만 보기"):
+            st.markdown(f"**제목:** {cr.get('title','')}")
+            if cr.get("sections"):
+                for sec in cr["sections"]:
+                    if sec.get("headline") or sec.get("items"):
+                        st.markdown(f"**[{sec.get('label','')}]** {sec.get('headline','')}")
+                        if sec.get("sub"):
+                            st.caption(sec["sub"])
+                        for it in sec.get("items", []):
+                            st.markdown(f"- {it}")
+            else:
+                st.markdown("**셀링포인트:**\n" + "\n".join(f"- {b}" for b in cr.get("bullets", [])))
+                st.markdown(f"**상세:** {cr.get('body','')}")
+            st.markdown("**태그:** " + " ".join("#"+t for t in cr.get("tags", [])))
+
+# ----- ④ 이미지
+with t4:
+    st.subheader("④ 이미지 생성")
+    with st.expander("📷 내 상품 사진 → 흰배경 합성", expanded=False):
+        up = st.file_uploader("상품 사진 업로드", type=["jpg", "jpeg", "png", "webp"], key="wb_up")
+        if up is not None:
+            st.image(up, caption="원본", width=240)
+            if st.button("흰배경으로 합성", key="wb_btn"):
+                if use_real and image_gen.available_removebg():
+                    try:
+                        out = image_gen.to_white_bg(up.getvalue())
+                        st.image(out, caption="흰배경 합성 결과", width=240)
+                        st.download_button("결과 PNG 저장", out, "white_bg.png", "image/png", key="wb_dl")
+                    except Exception as e:
+                        st.error(f"합성 실패: {e}")
+                else:
+                    st.info("REMOVE_BG_API_KEY 없음 또는 실데이터 OFF → 합성 불가")
+    with st.expander("📸 사진으로 구간 이미지 확장(여러 컷)", expanded=False):
+        ups = st.file_uploader("상품 사진 1~2장 업로드", type=["jpg", "jpeg", "png", "webp"],
+                               accept_multiple_files=True, key="exp_up")
+        use_thumb = st.checkbox("도매꾹 선택상품 썸네일 사용", value=False, key="exp_thumb",
+                                help="②소싱에서 선택한 상품 썸네일을 기준 이미지로 사용")
+        scenes = st.multiselect("만들 구간 이미지", list(image_gen.SCENE_PROMPTS.keys()),
+                                default=list(image_gen.SCENE_PROMPTS.keys()), key="exp_scenes")
+        if st.button("구간 이미지 생성", key="exp_btn"):
+            ref = None
+            if ups:
+                ref = ups[0].getvalue()
+            elif use_thumb:
+                sp2 = st.session_state.get("sourcing_pick")
+                turl = ""
+                if "src_df" in st.session_state and sp2:
+                    m = st.session_state["src_df"]
+                    m = m[m["상품후보"] == sp2.get("product")]
+                    if not m.empty:
+                        turl = str(m.iloc[0].get("썸네일") or "")
+                if turl:
+                    try:
+                        import requests as _rq
+                        ref = _rq.get(turl, timeout=15).content
+                    except Exception as e:
+                        st.error(f"썸네일 불러오기 실패: {e}")
+            if not ref:
+                st.warning("사진을 업로드하거나, ②에서 상품 선택 후 '도매꾹 썸네일 사용'을 켜세요.")
+            elif not (use_real and (image_gen.available_gemini() or image_gen.available_openai())):
+                st.info("실데이터 OFF 또는 이미지 키 없음 → 생성 불가")
+            elif not scenes:
+                st.warning("만들 구간 이미지를 1개 이상 선택하세요.")
+            else:
+                st.image(ref, caption="기준 사진", width=200)
+                results = image_gen.expand_from_reference(ref, scenes)
+                gcols = st.columns(2)
+                for i, (scene, b64, eng, err) in enumerate(results):
+                    with gcols[i % 2]:
+                        if b64:
+                            data = image_gen.b64_to_bytes(b64)
+                            st.image(data, caption=f"{scene} · {eng}")
+                            st.download_button("저장", data, f"{scene}.png", "image/png", key=f"exp_dl_{i}")
+                        else:
+                            st.error(f"{scene} 실패: {err}")
+                _smap = {"흰배경 메인컷": "solution", "사용 연출컷": "story",
+                         "배경 교체": "benefits", "디테일 클로즈업": "how"}
+                simgs = {}
+                for scene, b64, eng, err in results:
+                    if b64 and scene in _smap:
+                        simgs[_smap[scene]] = "data:image/png;base64," + b64
+                if simgs:
+                    st.session_state["section_images"] = simgs
+                    st.success(f"{len(simgs)}장을 ③ 상세페이지 섹션에 배치 준비 완료 (③에서 자동 사용)")
+        st.caption("주의: 제품 디테일(로고·글자)은 변형될 수 있어, 정품 디테일컷은 실사 권장.")
+    cr = st.session_state.get("copy_result")
+    dp = ""
+    if cr:
+        dp = f"Studio e-commerce hero shot for '{cr.get('title','product')}', clean white background, photorealistic, 1:1"
+    prompt = st.text_area("이미지 프롬프트", value=dp, height=90)
+    rm = st.checkbox("배경 제거(remove.bg)")
+    if st.button("이미지 생성", type="primary"):
+        if use_real and (image_gen.available_gemini() or image_gen.available_openai()):
+            try:
+                imgs, eng = image_gen.generate_image(prompt)
+                st.caption('이미지 엔진: ' + eng)
+                for b64 in imgs:
+                    data = image_gen.b64_to_bytes(b64)
+                    if rm and image_gen.available_removebg():
+                        try:
+                            data = image_gen.remove_background(data)
+                        except Exception as e:
+                            st.warning(f"배경제거 실패: {e}")
+                    st.image(data, caption=eng)
+                    st.download_button("이미지 저장", data, "product.png", "image/png")
+            except Exception as e:
+                st.error(f"이미지 생성 실패: {e}")
+        else:
+            st.info("실데이터 OFF 또는 이미지 키 없음 → 모의 표시")
+            svg = "<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><rect width='100%' height='100%' fill='#f0f0f0'/><text x='50%' y='50%' text-anchor='middle' fill='#888'>MOCK IMAGE</text></svg>"
+            st.image("data:image/svg+xml;utf8," + svg)
+    st.caption("제품 본컷은 실사 권장 · AI는 연출/배경/인포그래픽 용도")
