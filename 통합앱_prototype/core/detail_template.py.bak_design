@@ -8,71 +8,7 @@ def _e(s):
     return _html.escape(str(s or ""))
 
 
-# 디자인 조정 기본값 — app.py 패널과 동일하게 유지
-DESIGN_DEFAULTS = {
-    "title_size": 40,
-    "sub_size": 16,
-    "sec_size": 28,
-    "body_size": 16,
-    "line_height": 1.2,
-    "letter_spacing": 0.0,
-    "word_keep": True,
-    "title_gap": 12,
-    "align": "center",
-    "hero_bg": "#111418",
-    "hero_fg": "#ffffff",
-    "accent": "#c8a04b",
-}
-
-
-def _design_css(design: dict) -> str:
-    """디자인 조정 dict → 기존 스타일 뒤에 덧붙일 override CSS 문자열."""
-    if not design:
-        return ""
-    d = dict(DESIGN_DEFAULTS)
-    d.update({k: v for k, v in design.items() if v is not None})
-    rules = []
-    if d.get("accent"):
-        rules.append(":root{--gold:%s;}" % d["accent"])
-    hero = []
-    if d.get("hero_bg"):
-        hero.append("background:%s" % d["hero_bg"])
-    if d.get("hero_fg"):
-        hero.append("color:%s" % d["hero_fg"])
-    if d.get("align"):
-        hero.append("text-align:%s" % d["align"])
-    if hero:
-        rules.append(".hero{%s}" % ";".join(hero))
-    h1 = []
-    if d.get("title_size"):
-        h1.append("font-size:%dpx" % int(d["title_size"]))
-    if d.get("line_height"):
-        h1.append("line-height:%s" % float(d["line_height"]))
-    if d.get("letter_spacing") is not None:
-        h1.append("letter-spacing:%sem" % float(d["letter_spacing"]))
-    if d.get("word_keep", True):
-        h1.append("word-break:keep-all")
-        h1.append("overflow-wrap:break-word")
-    if d.get("align"):
-        h1.append("text-align:%s" % d["align"])
-    if d.get("hero_fg"):
-        h1.append("color:%s" % d["hero_fg"])
-    if d.get("title_gap") is not None:
-        h1.append("margin-bottom:%dpx" % int(d["title_gap"]))
-    if h1:
-        rules.append(".hero h1{%s}" % ";".join(h1))
-    if d.get("sub_size"):
-        rules.append(".hero p.tag{font-size:%dpx;word-break:keep-all;}" % int(d["sub_size"]))
-    if d.get("sec_size"):
-        rules.append("h2.sec{font-size:%dpx;word-break:keep-all;}" % int(d["sec_size"]))
-    if d.get("body_size"):
-        bs = int(d["body_size"])
-        rules.append(".lead{font-size:%dpx;word-break:keep-all;}" % bs)
-        rules.append(".dlist{font-size:%dpx;word-break:keep-all;}" % bs)
-    return "".join(rules)
-
-
-def build_detail_html(copy: dict, hero_img: str = "", meta: dict = None, design: dict = None) -> str:
+def build_detail_html(copy: dict, hero_img: str = "", meta: dict = None) -> str:
     """copy: {title,bullets,body,tags,image_brief,...}, hero_img: data URI 또는 URL, meta: 사양 dict"""
     copy = copy or {}
     meta = meta or {}
@@ -108,7 +44,6 @@ def build_detail_html(copy: dict, hero_img: str = "", meta: dict = None, design:
         spec_rows += f"<tr><th>{_e(k)}</th><td><span{cls}>{_e(v)}</span></td></tr>"
 
     tag_line = " ".join("#" + _e(t) for t in tags)
-    design_css = _design_css(design)
 
     return f"""<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>{title}</title>
@@ -144,7 +79,6 @@ td .fill{{color:#cd2e3a;font-weight:600;}}
 .cta h2{{font-size:24px;font-weight:900;}} .cta .btn{{display:inline-block;margin-top:22px;background:var(--gold);color:#1a1a1a;font-weight:800;padding:14px 38px;border-radius:999px;}}
 .foot{{padding:24px;font-size:12px;color:#9aa3af;text-align:center;background:#f3f4f2;}}
 @media(max-width:560px){{.points,.frow{{grid-template-columns:1fr;}}}}
-{design_css}
 </style></head><body><div class="wrap">
 <header class="hero"><h1>{title}</h1><p class="tag">{tagline}</p>
 <div class="badges">{badges}</div>{hero_visual}</header>
@@ -163,7 +97,7 @@ td .fill{{color:#cd2e3a;font-weight:600;}}
 </div></body></html>"""
 
 
-def build_detail_html_13(copy: dict, hero_img: str = "", meta: dict = None, section_images: dict = None, design: dict = None) -> str:
+def build_detail_html_13(copy: dict, hero_img: str = "", meta: dict = None, section_images: dict = None) -> str:
     """13섹션 감정여정 카피(dict with 'sections')를 프리미엄 HTML로 렌더."""
     copy = copy or {}
     meta = meta or {}
@@ -213,7 +147,6 @@ def build_detail_html_13(copy: dict, hero_img: str = "", meta: dict = None, sect
     tag_line = " ".join("#" + _e(t) for t in tags)
     css = build_detail_html({}, "", {}).split("<style>")[1].split("</style>")[0]
     css += " .dlist{max-width:620px;margin:14px auto 0;padding-left:18px;text-align:left;font-size:15px;color:#374151;line-height:1.9} .stripe .dlist{color:#dfe6da} .note{max-width:620px;margin:12px auto 0;color:#888;font-size:13px} .stripe .note{color:#aebaa6}"
-    css += _design_css(design)
     return f"""<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>{title}</title>
 <style>{css}</style></head><body><div class="wrap">
