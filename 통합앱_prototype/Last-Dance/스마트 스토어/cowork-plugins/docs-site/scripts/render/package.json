@@ -1,0 +1,14 @@
+{
+  "name": "docs-diagram-render",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "docs-site mermaid lint + 페이지 렌더링 검증 (puppeteer). drawio export는 v2.23.0에서 제거 — mermaid 단일화.",
+  "scripts": {
+    "lint:mermaid": "node lint-mermaid.mjs",
+    "verify:pages": "node verify-pages.mjs"
+  },
+  "dependencies": {
+    "puppeteer": "^23.9.0"
+  }
+}

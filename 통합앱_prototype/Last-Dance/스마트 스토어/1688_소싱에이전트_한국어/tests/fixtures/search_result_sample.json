@@ -1,0 +1,49 @@
+{
+  "status": "ok",
+  "items": [
+    {
+      "offer_id": "123456789",
+      "url": "https://detail.1688.com/offer/123456789.html",
+      "title_zh": "黑胶防晒晴雨伞 三折遮阳伞",
+      "image_url": "https://example.com/images/123456789-main.jpg",
+      "price_min": 12.5,
+      "price_max": 18.8,
+      "currency": "CNY",
+      "moq": 2,
+      "month_sold": 3200,
+      "trade_volume": 8900,
+      "repurchase_rate": 0.34,
+      "seller_name": "义乌优伞工厂",
+      "seller_url": "https://example.1688.com",
+      "seller_score": 4.8,
+      "seller_level": "实力商家",
+      "badges": ["实力商家", "源头工厂"],
+      "shipping_badges": ["48小时发货"],
+      "is_one_piece_dropship_available": true,
+      "source_keyword": "黑胶伞",
+      "missing_fields": []
+    },
+    {
+      "offer_id": "987654321",
+      "url": "https://detail.1688.com/offer/987654321.html",
+      "title_zh": "防紫外线遮阳伞 批发定制",
+      "image_url": "https://example.com/images/987654321-main.jpg",
+      "price_min": 7.9,
+      "price_max": 9.2,
+      "currency": "CNY",
+      "moq": 50,
+      "month_sold": 12000,
+      "trade_volume": 18000,
+      "repurchase_rate": null,
+      "seller_name": "广州伞业批发",
+      "seller_url": "https://seller.example.com",
+      "seller_score": null,
+      "seller_level": null,
+      "badges": ["批发"],
+      "shipping_badges": [],
+      "is_one_piece_dropship_available": false,
+      "source_keyword": "防紫外线伞",
+      "missing_fields": ["repurchase_rate", "seller_score", "seller_level"]
+    }
+  ]
+}

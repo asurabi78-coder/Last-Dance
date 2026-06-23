@@ -1,0 +1,8 @@
+insight_id,source_post_url,post_type,user_quote,action_type,specific_output,priority_P0_P1_P2,owner,status_todo_doing_done
+I001,https://reddit.com/r/example/abc123,Rant,"I have to take it apart into 7 pieces every week",listing_copy,"主标题:One-step clean. No taking it apart.",P0,产品文案,todo
+I002,https://reddit.com/r/example/abc123,Rant,"I have to take it apart into 7 pieces every week",ad_hook,"TikTok hook: '7 pieces. 45 minutes. Every week.' (对比式)",P0,营销,todo
+I003,https://reddit.com/r/example/def456,Question,"Cycled 3 times, sensor erroring",customer_service,"FAQ: 传感器错误 30 秒解决教程",P1,客服,todo
+I004,https://reddit.com/r/example/def456,Question,"Cycled 3 times, sensor erroring",aplus_content,"A+ Section: How to clean the sensor (预防式)",P1,产品文案,todo
+I005,https://reddit.com/r/example/jkl012,Discussion,"All that plastic, breaks in 3 years",marketing_landmine,"避免使用 '塑料升级 / 智能加'话术,改用 '可修复 / 模块化'",P0,品牌,doing
+I006,https://reddit.com/r/example/mno345,Recommendation,"My cat is 15 — can't jump high anymore",new_product,"R&D: 低姿态自清洁版本,目标老猫人群",P2,产品,todo
+I007,https://reddit.com/r/example/mno345,Recommendation,"My cat is 15 — can't jump high anymore",seo_longtail,"关键词: 'automatic litter box for elderly cat'",P1,SEO,todo

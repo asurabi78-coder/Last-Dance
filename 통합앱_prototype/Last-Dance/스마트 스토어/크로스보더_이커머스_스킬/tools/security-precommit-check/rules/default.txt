@@ -1,0 +1,53 @@
+# Universal pre-commit security rules.
+#
+# Format: SEVERITY|PATTERN|DESCRIPTION
+#   SEVERITY = BLOCK (rejects commit) | WARN (prints warning, allows commit)
+#   PATTERN  = extended-regex (passed to `grep -E`)
+#   Lines starting with # and blank lines are ignored.
+#
+# When tweaking patterns: test against your current codebase via
+#   tools/security-precommit-check/scripts/scan.sh --all
+# to gauge false-positive rate before committing the rule change.
+
+# ============================================================================
+# API keys (BLOCK — these are real secrets, never commit)
+# ============================================================================
+BLOCK|sk-ant-(api03-)?[a-zA-Z0-9_\-]{40,}|Anthropic API key
+BLOCK|sk-proj-[a-zA-Z0-9_\-]{40,}|OpenAI project API key
+BLOCK|sk-(?!ant-\|proj-)[a-zA-Z0-9]{40,}|OpenAI / generic sk- API key
+BLOCK|ghp_[a-zA-Z0-9]{36}|GitHub Personal Access Token (classic)
+BLOCK|gho_[a-zA-Z0-9]{36}|GitHub OAuth token
+BLOCK|github_pat_[a-zA-Z0-9_]{60,}|GitHub PAT (fine-grained)
+BLOCK|xox[baprs]-[a-zA-Z0-9-]{10,}|Slack token
+BLOCK|AKIA[0-9A-Z]{16}|AWS Access Key ID
+BLOCK|sk_live_[a-zA-Z0-9]{24,}|Stripe secret key (LIVE)
+BLOCK|rk_live_[a-zA-Z0-9]{24,}|Stripe restricted key (LIVE)
+
+# ============================================================================
+# Database / proxy / connection-string credentials (BLOCK)
+# ============================================================================
+# HOST:PORT:USER:PASS proxy strings (rules out localhost via first-octet 1-9
+# and requires user/pass be ≥8 chars to skip "none:none")
+BLOCK|[1-9][0-9]{0,2}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}:[0-9]+:[a-zA-Z0-9]{8,}:[a-zA-Z0-9]{8,}|HOST:PORT:USER:PASS credential string
+# Database URLs with embedded creds (matches non-localhost via simple substring exclude)
+BLOCK|postgres(ql)?://[^/[:space:]]+:[^/[:space:]@]+@[^/[:space:]]+|PostgreSQL URL with embedded password
+BLOCK|mysql://[^/[:space:]]+:[^/[:space:]@]+@[^/[:space:]]+|MySQL URL with embedded password
+BLOCK|mongodb(\+srv)?://[^/[:space:]]+:[^/[:space:]@]+@[^/[:space:]]+|MongoDB URL with embedded password
+
+# ============================================================================
+# JWT / private keys (BLOCK)
+# ============================================================================
+BLOCK|-----BEGIN [A-Z]+ PRIVATE KEY-----|PEM private key
+BLOCK|eyJ[a-zA-Z0-9_\-]{20,}\.eyJ[a-zA-Z0-9_\-]{20,}\.[a-zA-Z0-9_\-]+|JWT token
+
+# ============================================================================
+# Personal home directory paths (WARN — may leak username)
+# ============================================================================
+WARN|/Users/[a-zA-Z]{4,}/[A-Za-z0-9._\-]+|macOS personal home path
+WARN|/home/[a-zA-Z]{4,}/[A-Za-z0-9._\-]+|Linux personal home path
+
+# ============================================================================
+# Hardcoded password / api_key literals (WARN — usually env-var ref instead)
+# ============================================================================
+WARN|password\s*[:=]\s*["'][a-zA-Z0-9!@#$%^&*]{8,}["']|Hardcoded password literal
+WARN|(api[_-]?key\|secret[_-]?key)\s*[:=]\s*["'][a-zA-Z0-9_\-]{20,}["']|Hardcoded api_key/secret_key literal

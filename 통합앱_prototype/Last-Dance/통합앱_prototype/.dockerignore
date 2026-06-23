@@ -1,0 +1,23 @@
+# 비밀키·환경파일 (절대 이미지에 포함 금지 → 환경변수로 주입)
+.env
+.env.bak
+*.env
+
+# 로컬 데이터/로그/백업
+saved/
+usage_log.jsonl
+*.bak
+*.bak_*
+core/*.bak_*
+
+# 캐시
+__pycache__/
+*/__pycache__/
+*.pyc
+
+# git / 기타
+.git/
+.gitignore
+*.log
+_b*.log
+_boot*.log

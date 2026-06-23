@@ -1,0 +1,13 @@
+{
+  "name": "moai-comms",
+  "displayName": "직장 커뮤니케이션",
+  "version": "2.27.0",
+  "description": "직장 커뮤니케이션·소프트스킬 — 보고·설명, 회의 진행, 피드백, 갈등 대응, 1:1 면담·협상",
+  "author": {
+    "name": "모두의AI"
+  },
+  "keywords": [
+    "커뮤니케이션", "보고", "회의", "피드백", "갈등", "소통", "면담", "협상"
+  ],
+  "license": "LicenseRef-MoAI-NC-ND-1.0"
+}

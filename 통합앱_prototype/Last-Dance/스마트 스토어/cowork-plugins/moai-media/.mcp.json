@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "higgsfield": {
+      "$comment": "Higgsfield 공식 hosted MCP — 이미지 11종(Soul·Soul 2.0·Soul Cinema·Nano Banana·Nano Banana Pro·GPT Image·GPT Image 2·Seedream 4.0·Flux Kontext·Wan 2.2 Image·Wan 2.5) + 영상 11종(Sora 2·Google Veo 3·Kling 2.1 Master·Kling 2.5 Turbo·Kling 3.0·Kling Avatars 2.0·Seedance 2.0·Seedance Pro·Cinema Studio 3.5·MiniMax Hailuo 02·Wan 2.5) + 6 비디오 프리셋(UGC·Unboxing·Product review·Hyper motion·TV spot·Wild Card). 공식 URL: https://mcp.higgsfield.ai/mcp. 첫 연결 시 OAuth 인증 1회.",
+      "type": "http",
+      "url": "https://mcp.higgsfield.ai/mcp"
+    },
+    "ElevenLabs": {
+      "$comment": "ElevenLabs 공식 MCP (github.com/elevenlabs/elevenlabs-mcp) — TTS·보이스 클로닝·다국어 더빙·효과음. audio-gen 스킬 전용. 사전 설치: curl -LsSf https://astral.sh/uv/install.sh | sh. ELEVENLABS_API_KEY 필수 (elevenlabs.io/app/settings/api-keys 발급). 옵션: ELEVENLABS_MCP_BASE_PATH (기본 ~/Desktop), ELEVENLABS_MCP_OUTPUT_MODE (files/resources/both), ELEVENLABS_API_RESIDENCY (us 등).",
+      "command": "uvx",
+      "args": ["elevenlabs-mcp"],
+      "env": {
+        "ELEVENLABS_API_KEY": "${ELEVENLABS_API_KEY}"
+      }
+    }
+  }
+}

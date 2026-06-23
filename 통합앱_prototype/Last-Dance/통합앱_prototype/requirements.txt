@@ -1,0 +1,7 @@
+streamlit>=1.33
+pandas
+python-dotenv
+requests
+openpyxl
+pillow
+bcrypt

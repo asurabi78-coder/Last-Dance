@@ -1,0 +1,12 @@
+# One Linktree handle per line. Lines starting with # are ignored.
+# Handle = the slug after linktr.ee/  (NOT the full URL, although URLs are also accepted)
+# Examples:
+#   example_creator
+#   https://linktr.ee/example_creator    ← also works
+#   creator.with.dots                    ← dots are valid
+
+# === Replace below with your seed list of Linktree handles ===
+# (typically extracted via tools/backlink-kol-extractor → kol_prospects_social.csv)
+example_creator_a
+example_creator_b
+example_brand_x

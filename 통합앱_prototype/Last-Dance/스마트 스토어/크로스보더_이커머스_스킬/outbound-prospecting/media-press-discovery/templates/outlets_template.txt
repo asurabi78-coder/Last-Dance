@@ -1,0 +1,39 @@
+# One outlet per line. Format: muckrack_slug,outlet_domain
+# Lines starting with # are ignored.
+# muckrack_slug = the path component after muckrack.com/media-outlet/
+#   e.g.  https://muckrack.com/media-outlet/teenvogue → slug = teenvogue
+# outlet_domain = the email-bearing root domain
+#   e.g.  teenvogue.com (NOT www.teenvogue.com)
+
+# === Tier A — major US lifestyle / wellness / women's interest outlets (sample seed list) ===
+refinery29,refinery29.com
+teenvogue,teenvogue.com
+byrdie,byrdie.com
+allure,allure.com
+cosmopolitan,cosmopolitan.com
+goodhousekeeping,goodhousekeeping.com
+people,people.com
+instyle,instyle.com
+buzzfeed,buzzfeed.com
+mashable,mashable.com
+businessinsider,businessinsider.com
+cnet,cnet.com
+parade,parade.com
+realsimple,realsimple.com
+thebump,thebump.com
+nymag,nymag.com
+parents,parents.com
+sheknows,sheknows.com
+everydayhealth,everydayhealth.com
+
+# === Tier A — news / consumer review ===
+nbc-news,nbcnews.com
+new-york-post,nypost.com
+consumer-reports,consumerreports.org
+wired,wired.com
+newsweek,newsweek.com
+huffpost,huffpost.com
+
+# === Tier A — UK / international ===
+the-guardian,theguardian.com
+glamourmagazine-uk,glamourmagazine.co.uk
