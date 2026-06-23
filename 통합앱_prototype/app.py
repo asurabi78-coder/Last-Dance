@@ -12,7 +12,7 @@ import pandas as pd
 import streamlit as st
 
 from concurrent.futures import ThreadPoolExecutor
-from core import config, naver_keyword, sourcing, copy_gpt, image_gen, detail_template, datalab_rank, store, batch, commerce, edit_util, usage
+from core import config, naver_keyword, sourcing, copy_gpt, image_gen, detail_template, datalab_rank, store, batch, commerce, edit_util, usage, cro, naver_seo
 import streamlit.components.v1 as components
 
 st.set_page_config(page_title="스마트스토어 통합 웹앱", page_icon="🛒", layout="wide")
@@ -322,6 +322,25 @@ with t3:
                         _safe_rerun()
                     else:
                         st.info("먼저 상세페이지를 생성하면 태그에 반영할 수 있습니다.")
+        st.markdown("---")
+        st.markdown("**🔍 상품명 SEO 점검 (네이버)**")
+        _seo_targets = []
+        if pr_in.strip():
+            _seo_targets.append(("현재 상품명", pr_in.strip()))
+        if _nr:
+            for _it in _nr.get("names", []):
+                if _it.get("상품명"):
+                    _seo_targets.append((_it.get("유형", "안"), _it["상품명"]))
+        if not _seo_targets:
+            st.caption("상품명을 입력하거나 3안을 생성하면 SEO 점검이 표시됩니다.")
+        for _slbl, _snm in _seo_targets:
+            _ss = naver_seo.check_name_seo(_snm, kw_in)
+            st.markdown(f"**[{_slbl}] {_ss['score']}/100 ({_ss['grade']})** · {_snm}")
+            for _sc in _ss["checks"]:
+                if _sc["level"] != "ok":
+                    _sic = {"warn": "⚠️", "fail": "❌"}.get(_sc["level"], "•")
+                    st.caption(f"{_sic} {_sc['name']}: {_sc['msg']}")
+        st.caption("※ 네이버 공개 가이드 기반 휴리스틱 점검입니다.")
     if st.button("상세페이지 생성", type="primary"):
         ok = (provider == "openai" and copy_gpt.available_openai()) or \
              (provider == "anthropic" and copy_gpt.available_anthropic())
@@ -466,6 +485,20 @@ with t3:
                 st.session_state["copy_result"] = _newcr
                 st.success("수정 적용됨. 위 미리보기가 갱신됩니다.")
                 _safe_rerun()
+        with st.expander("🎯 전환율(CRO) 점검"):
+            if st.button("점검 실행", key="cro_run"):
+                st.session_state["cro_result"] = cro.audit(cr)
+            _ar = st.session_state.get("cro_result")
+            if _ar:
+                st.metric("전환율 점수", f"{_ar['score']}/100  ·  등급 {_ar['grade']}")
+                for _c in _ar["checks"]:
+                    _ic = {"ok": "✅", "warn": "⚠️", "fail": "❌"}.get(_c["level"], "•")
+                    st.markdown(f"{_ic} **{_c['name']}** — {_c['msg']}")
+                if _ar["suggestions"]:
+                    st.markdown("**개선 우선순위:**")
+                    for _s in _ar["suggestions"]:
+                        st.markdown(f"- {_s}")
+            st.caption("※ 일반 전환율(CRO) 기준입니다. 네이버 검색노출(SEO)과는 별개입니다.")
 
 # ----- ④ 이미지
 with t4:
