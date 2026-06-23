@@ -135,18 +135,10 @@ USER_13 = (
 )
 
 
-FRAMEWORKS = {
-    "PAS": "PAS(Problem-Agitate-Solution) 흐름 강조: 고통점을 구체화(Problem)→방치 시 손해를 부각(Agitate)→상품을 필연적 해결책으로 제시(Solution).",
-    "AIDA": "AIDA 흐름 강조: Hero에서 강한 주목(Attention)→초반에 흥미(Interest)→혜택·증거로 욕구(Desire)→CTA에서 즉각 행동(Action).",
-    "BAB": "BAB(Before-After-Bridge) 흐름 강조: 현재의 불편(Before)→해결된 모습(After)→상품이 그 다리(Bridge)임을 선명히 대비.",
-}
-
-
-def generate_13(product, keyword, features="", target="", provider="openai", framework="PAS"):
+def generate_13(product, keyword, features="", target="", provider="openai"):
     user = USER_13.format(product=product, keyword=keyword,
                           features=features or "-", target=target or "일반 소비자")
-    _sys = SYSTEM_13 + " 추가 카피 프레임워크 지침: " + FRAMEWORKS.get(framework, FRAMEWORKS["PAS"])
-    data = _parse_json(_chat([{"role": "system", "content": _sys},
+    data = _parse_json(_chat([{"role": "system", "content": SYSTEM_13},
                               {"role": "user", "content": user}], provider, max_tokens=COPY_MAX_TOKENS))
     # 섹션 정규화: 순서 보장 + 누락 채움
     by_key = {}
@@ -237,33 +229,3 @@ def product_names(keyword, features="", brand="", target="", provider="openai"):
     data.setdefault("hashtags", [])
     data.setdefault("blog_titles", [])
     return data
-
-
-# ---------- 헤드라인 A/B 변형 ----------
-SYSTEM_AB = (
-    "당신은 한국 스마트스토어 카피라이터입니다. 같은 상품에 대해 서로 다른 각도의 Hero 헤드라인 2안을 만듭니다. "
-    "A안은 '혜택형'(핵심 이점 강조), B안은 '문제해결형'(고객 고통 해결 강조). "
-    "과장·허위·금지어(최저가/1위/100%/효능 등)는 쓰지 않습니다. 반드시 JSON으로만 답합니다."
-)
-USER_AB = (
-    '상품명: {product}\n키워드: {keyword}\n특징: {features}\n타깃: {target}\n\n'
-    '아래 JSON으로 2안 작성:\n'
-    '{{"variants":[{{"label":"혜택형","headline":"30자내 헤드라인","sub":"한 줄 서브카피"}},'
-    '{{"label":"문제해결형","headline":"","sub":""}}]}}'
-)
-
-
-def headline_ab(product, keyword, features="", target="", provider="openai"):
-    """Hero 헤드라인 A/B 2안 생성. 반환: {'variants':[{label,headline,sub} x2], 'provider'}."""
-    user = USER_AB.format(product=product, keyword=keyword,
-                          features=features or "-", target=target or "일반 소비자")
-    data = _parse_json(_chat([{"role": "system", "content": SYSTEM_AB},
-                              {"role": "user", "content": user}], provider, max_tokens=600))
-    out = []
-    for v in (data.get("variants") or [])[:2]:
-        out.append({"label": str(v.get("label", "")),
-                    "headline": str(v.get("headline", "")),
-                    "sub": str(v.get("sub", ""))})
-    while len(out) < 2:
-        out.append({"label": "안" + str(len(out) + 1), "headline": "", "sub": ""})
-    return {"variants": out, "provider": provider}

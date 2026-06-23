@@ -12,7 +12,7 @@ import pandas as pd
 import streamlit as st
 
 from concurrent.futures import ThreadPoolExecutor
-from core import config, naver_keyword, sourcing, copy_gpt, image_gen, detail_template, datalab_rank, store, batch, commerce
+from core import config, naver_keyword, sourcing, copy_gpt, image_gen, detail_template, datalab_rank, store, batch, commerce, edit_util, usage, cro, naver_seo
 import streamlit.components.v1 as components
 
 st.set_page_config(page_title="스마트스토어 통합 웹앱", page_icon="🛒", layout="wide")
@@ -35,6 +35,14 @@ def ss(k, v):
 ss("kw_selected", [])
 ss("sourcing_pick", None)
 ss("copy_result", None)
+ss("editing_saved_id", None)
+ss("edit_nonce", 0)
+
+
+def _safe_rerun():
+    fn = getattr(st, "rerun", None) or getattr(st, "experimental_rerun", None)
+    if fn:
+        fn()
 
 
 def mock_keywords(seed):
@@ -68,6 +76,25 @@ with st.sidebar:
     use_real = st.toggle("실데이터 사용(API 호출)", value=True,
                          help="끄면 모든 단계가 모의 데이터로 동작합니다.")
     st.caption("외부 통신이 막힌 환경이면 자동으로 모의 폴백됩니다.")
+    with st.expander("💰 사용량 / 추정 비용", expanded=False):
+        _ut = usage.totals()
+        st.metric("누적 추정 비용(USD)", f"${_ut['total']['cost']:.4f}")
+        st.caption(f"호출 {_ut['total']['calls']}회 · 토큰 {_ut['total']['tokens']:,} · 이미지 {_ut['total']['images']}장")
+        for _pv, _b in _ut["by_provider"].items():
+            st.caption(f"· {_pv}: ${_b['cost']:.4f} (토큰 {_b['tokens']:,}, 이미지 {_b['images']})")
+        _uper = st.radio("기간", ["일별", "주간", "월별"], horizontal=True, key="usage_period")
+        _umap = {"일별": "day", "주간": "week", "월별": "month"}
+        _uagg = usage.aggregate(_umap[_uper])
+        if _uagg:
+            _udf = pd.DataFrame(_uagg).set_index("period")
+            st.bar_chart(_udf["cost"])
+            st.caption("막대 = 기간별 추정 비용(USD)")
+        else:
+            st.caption("아직 사용 기록이 없습니다. (API 호출 시 자동 누적)")
+        if st.button("기록 초기화", key="usage_reset"):
+            usage.reset()
+            _safe_rerun()
+        st.caption("※ 추정치입니다(요금표 기반). 계정 잔액은 각 사 결제 페이지에서 확인하세요.")
 
 st.title("🛒 스마트스토어 통합 웹앱")
 st.caption("키워드 → 소싱 → 상세페이지 → 이미지")
@@ -246,12 +273,16 @@ with t3:
     dpr = sp["product"] if sp else ""
     c1, c2 = st.columns(2)
     kw_in = c1.text_input("키워드", value=dkw)
-    pr_in = c2.text_input("상품명", value=dpr, placeholder="예: DMPS 로카티 쿨드라이 반팔티")
+    _pr_pending = st.session_state.pop("pr_pending", None)
+    pr_in = c2.text_input("상품명", value=(_pr_pending if _pr_pending is not None else dpr),
+                          placeholder="예: DMPS 로카티 쿨드라이 반팔티")
     feat = st.text_input("핵심 특징(쉼표)", placeholder="쿨드라이, 남녀공용, ROKA 디테일")
     o1, o2, o3 = st.columns(3)
     mode_13 = o1.checkbox("13섹션 감정여정", value=True, help="Hero→Pain→…→CTA 13섹션 고전환 구조")
     do_human = o2.checkbox("문체 정리(humanize)", value=True, help="번역투·AI관용구 제거(호출 1회 추가)")
     include_img = o3.checkbox("AI 대표이미지(B)", value=True, help="상단 대표이미지 생성(과금)")
+    _framework = st.selectbox("카피 방식(프레임워크)", ["PAS", "AIDA", "BAB"],
+                              help="PAS=문제·자극·해결 / AIDA=주목·흥미·욕구·행동 / BAB=비포·애프터·브릿지")
     _sp_thumb = (sp or {}).get("thumb") if sp else ""
     if _sp_thumb:
         tc1, tc2 = st.columns([1, 4])
@@ -265,6 +296,53 @@ with t3:
     else:
         use_thumb_img = False
         st.caption("ℹ️ ② 소싱에서 상품을 선택하면 대표이미지를 가져와 AI가 그 사진으로 작업합니다. (지금은 텍스트 생성)")
+    with st.expander("🏷️ 상품명 3안·해시태그 (선택)"):
+        if st.button("상품명 3안 생성", key="t3_name_btn"):
+            if use_real and (copy_gpt.available_openai() or copy_gpt.available_anthropic()):
+                try:
+                    st.session_state["t3_name_res"] = copy_gpt.product_names(
+                        kw_in or pr_in or "상품", features=feat, provider=provider)
+                except Exception as _e:
+                    st.error(f"상품명 생성 실패: {_e}")
+            else:
+                st.info("실데이터 OFF 또는 LLM 키 없음")
+        _nr = st.session_state.get("t3_name_res")
+        if _nr:
+            _names = [it.get("상품명", "") for it in _nr.get("names", []) if it.get("상품명")]
+            if _names:
+                _pick_name = st.radio("상품명 3안", _names, key="t3_name_pick")
+                if st.button("이 상품명 사용", key="t3_use_name"):
+                    st.session_state["pr_pending"] = _pick_name
+                    _safe_rerun()
+            if _nr.get("hashtags"):
+                st.caption("해시태그: " + " ".join("#" + str(h) for h in _nr["hashtags"]))
+                if st.button("해시태그를 상세페이지 태그에 반영", key="t3_merge_tags"):
+                    _cur = st.session_state.get("copy_result")
+                    if _cur:
+                        st.session_state["copy_result"] = edit_util.merge_hashtags(_cur, _nr["hashtags"])
+                        st.success("태그에 반영됨. 아래 미리보기가 갱신됩니다.")
+                        _safe_rerun()
+                    else:
+                        st.info("먼저 상세페이지를 생성하면 태그에 반영할 수 있습니다.")
+        st.markdown("---")
+        st.markdown("**🔍 상품명 SEO 점검 (네이버)**")
+        _seo_targets = []
+        if pr_in.strip():
+            _seo_targets.append(("현재 상품명", pr_in.strip()))
+        if _nr:
+            for _it in _nr.get("names", []):
+                if _it.get("상품명"):
+                    _seo_targets.append((_it.get("유형", "안"), _it["상품명"]))
+        if not _seo_targets:
+            st.caption("상품명을 입력하거나 3안을 생성하면 SEO 점검이 표시됩니다.")
+        for _slbl, _snm in _seo_targets:
+            _ss = naver_seo.check_name_seo(_snm, kw_in)
+            st.markdown(f"**[{_slbl}] {_ss['score']}/100 ({_ss['grade']})** · {_snm}")
+            for _sc in _ss["checks"]:
+                if _sc["level"] != "ok":
+                    _sic = {"warn": "⚠️", "fail": "❌"}.get(_sc["level"], "•")
+                    st.caption(f"{_sic} {_sc['name']}: {_sc['msg']}")
+        st.caption("※ 네이버 공개 가이드 기반 휴리스틱 점검입니다.")
     if st.button("상세페이지 생성", type="primary"):
         ok = (provider == "openai" and copy_gpt.available_openai()) or \
              (provider == "anthropic" and copy_gpt.available_anthropic())
@@ -301,7 +379,7 @@ with t3:
                 if use_real and ok:
                     try:
                         if mode_13:
-                            cr = copy_gpt.generate_13(pr_in or "상품", kw_in or "키워드", features=feat, provider=provider)
+                            cr = copy_gpt.generate_13(pr_in or "상품", kw_in or "키워드", features=feat, provider=provider, framework=_framework)
                         else:
                             cr = copy_gpt.generate(pr_in or "상품", kw_in or "키워드", features=feat, provider=provider)
                         if do_human:
@@ -322,6 +400,8 @@ with t3:
             if hero_url:
                 cr["hero_engine"] = hero_eng
             st.session_state["copy_result"] = cr
+            st.session_state["editing_saved_id"] = None
+            st.session_state["edit_nonce"] = st.session_state.get("edit_nonce", 0) + 1
     cr = st.session_state.get("copy_result")
     if cr:
         tag = cr.get("provider", "")
@@ -343,14 +423,35 @@ with t3:
                                                          meta={"상품명": pr_in or cr.get("title", "")})
             components.html(page, height=1000, scrolling=True)
             st.download_button("상세페이지 HTML 다운로드", page.encode("utf-8"), "상세페이지.html", "text/html")
-            if st.button("💾 이 상세페이지 저장", key="save_detail_btn"):
-                try:
-                    _sid = store.save_detail(cr, html=page,
-                                             meta={"상품명": pr_in or cr.get("title", ""), "키워드": kw_in},
-                                             hero=cr.get("hero"))
-                    st.success(f"저장됨: {_sid}  ·  '📦 배치 & 저장함' 탭에서 확인하세요.")
-                except Exception as _e:
-                    st.error(f"저장 실패: {_e}")
+            _editing_id = st.session_state.get("editing_saved_id")
+            if _editing_id:
+                st.caption(f"저장함 항목 편집 중: {_editing_id}")
+                _sc1, _sc2 = st.columns(2)
+                if _sc1.button("💾 덮어쓰기 저장", key="save_overwrite"):
+                    try:
+                        store.update_detail(_editing_id, cr, html=page,
+                                            meta={"상품명": pr_in or cr.get("title", ""), "키워드": kw_in})
+                        st.success(f"덮어쓰기 저장됨: {_editing_id}")
+                    except Exception as _e:
+                        st.error(f"저장 실패: {_e}")
+                if _sc2.button("💾 새 항목으로 저장", key="save_asnew"):
+                    try:
+                        _sid = store.save_detail(cr, html=page,
+                                                 meta={"상품명": pr_in or cr.get("title", ""), "키워드": kw_in},
+                                                 hero=cr.get("hero"))
+                        st.session_state["editing_saved_id"] = None
+                        st.success(f"새로 저장됨: {_sid}")
+                    except Exception as _e:
+                        st.error(f"저장 실패: {_e}")
+            else:
+                if st.button("💾 이 상세페이지 저장", key="save_detail_btn"):
+                    try:
+                        _sid = store.save_detail(cr, html=page,
+                                                 meta={"상품명": pr_in or cr.get("title", ""), "키워드": kw_in},
+                                                 hero=cr.get("hero"))
+                        st.success(f"저장됨: {_sid}  ·  '📦 배치 & 저장함' 탭에서 확인하세요.")
+                    except Exception as _e:
+                        st.error(f"저장 실패: {_e}")
         except Exception as e:
             st.error(f"상세페이지 렌더 실패: {e}")
         with st.expander("텍스트(카피)만 보기"):
@@ -367,6 +468,39 @@ with t3:
                 st.markdown("**셀링포인트:**\n" + "\n".join(f"- {b}" for b in cr.get("bullets", [])))
                 st.markdown(f"**상세:** {cr.get('body','')}")
             st.markdown("**태그:** " + " ".join("#"+t for t in cr.get("tags", [])))
+        with st.expander("✏️ 카피 수정"):
+            _nz = st.session_state.get("edit_nonce", 0)
+            _ed_title = st.text_input("제목", value=cr.get("title", ""), key=f"ed_title_{_nz}")
+            _ed_tags = st.text_input("태그(쉼표)", value=", ".join(cr.get("tags", []) or []), key=f"ed_tags_{_nz}")
+            _sec_edits = {}
+            for _sec in (cr.get("sections") or []):
+                _k = _sec.get("key")
+                st.markdown(f"**[{_sec.get('label','')}]**")
+                _h = st.text_input("헤드라인", value=_sec.get("headline", ""), key=f"ed_h_{_nz}_{_k}")
+                _sub = st.text_input("서브", value=_sec.get("sub", ""), key=f"ed_s_{_nz}_{_k}")
+                _items = st.text_area("항목(줄바꿈)", value="\n".join(_sec.get("items", []) or []),
+                                      key=f"ed_i_{_nz}_{_k}", height=68)
+                _sec_edits[_k] = {"headline": _h, "sub": _sub, "items_text": _items}
+            if st.button("수정 적용", key=f"ed_apply_{_nz}"):
+                _newcr = edit_util.apply_edits(cr, title=_ed_title, tags_text=_ed_tags,
+                                               section_edits=_sec_edits or None)
+                st.session_state["copy_result"] = _newcr
+                st.success("수정 적용됨. 위 미리보기가 갱신됩니다.")
+                _safe_rerun()
+        with st.expander("🎯 전환율(CRO) 점검"):
+            if st.button("점검 실행", key="cro_run"):
+                st.session_state["cro_result"] = cro.audit(cr)
+            _ar = st.session_state.get("cro_result")
+            if _ar:
+                st.metric("전환율 점수", f"{_ar['score']}/100  ·  등급 {_ar['grade']}")
+                for _c in _ar["checks"]:
+                    _ic = {"ok": "✅", "warn": "⚠️", "fail": "❌"}.get(_c["level"], "•")
+                    st.markdown(f"{_ic} **{_c['name']}** — {_c['msg']}")
+                if _ar["suggestions"]:
+                    st.markdown("**개선 우선순위:**")
+                    for _s in _ar["suggestions"]:
+                        st.markdown(f"- {_s}")
+            st.caption("※ 일반 전환율(CRO) 기준입니다. 네이버 검색노출(SEO)과는 별개입니다.")
 
 # ----- ④ 이미지
 with t4:
@@ -542,6 +676,23 @@ with t5:
                         _safe_rerun()
                     else:
                         st.error("삭제 실패")
+                if st.button("✏️ ③로 불러와 수정", key=f"edit_{_it['id']}"):
+                    _d2 = store.load_detail(_it["id"])
+                    if _d2:
+                        _cr2 = dict(_d2.get("copy") or {})
+                        if _d2.get("hero_path"):
+                            try:
+                                import base64 as _b64
+                                with open(_d2["hero_path"], "rb") as _hf:
+                                    _cr2["hero"] = "data:image/png;base64," + _b64.b64encode(_hf.read()).decode()
+                            except Exception:
+                                pass
+                        st.session_state["copy_result"] = _cr2
+                        st.session_state["editing_saved_id"] = _it["id"]
+                        st.session_state["edit_nonce"] = st.session_state.get("edit_nonce", 0) + 1
+                        st.session_state["pr_pending"] = (_d2.get("meta") or {}).get("상품명") or _cr2.get("title", "")
+                        st.success("③ 상세페이지 탭에서 불러왔습니다. ③로 이동해 수정 후 '덮어쓰기 저장'을 누르세요.")
+                        _safe_rerun()
                 with st.expander("🛒 스마트스토어 임시저장 업로드 (미리보기)"):
                     if not commerce.available():
                         st.caption("커머스API 키(NAVER_COMMERCE_*)가 없어 업로드를 사용할 수 없습니다.")
@@ -567,4 +718,26 @@ with t5:
                                 _payload = commerce.build_payload(_u_inp, status_type="WAIT")
                                 st.success("등록 페이로드 미리보기 — 실제 전송 안 함 (statusType=WAIT, 판매대기)")
                                 st.json(_payload)
-                        st.caption("※ 실제 업로드(3b)는 PC에서 실키로 검증 후 활성화됩니다. 지금은 미리보기 전용입니다.")
+                        st.markdown("---")
+                        _confirm = st.checkbox("실제 업로드 확인 — 내 스마트스토어에 '판매대기'로 등록", key=f"confirm_{_it['id']}")
+                        if st.button("🚀 스마트스토어에 업로드 (판매대기)", key=f"upload_{_it['id']}", disabled=not _confirm):
+                            _miss = commerce.validate_inputs({**_u_inp, "representativeImageUrl": "x" if _has_img else ""})
+                            if not _has_img:
+                                st.error("대표이미지가 없는 항목입니다. ③에서 대표이미지를 만들어 저장한 항목만 업로드됩니다.")
+                            elif _miss:
+                                st.warning("입력 필요: " + ", ".join(_miss))
+                            else:
+                                with st.spinner("토큰 발급 → 이미지 업로드 → 상품 등록(판매대기) 중…"):
+                                    try:
+                                        _tok = commerce.get_token()
+                                        with open(_d["hero_path"], "rb") as _hf:
+                                            _imgurls = commerce.upload_image(_hf.read(), _tok)
+                                        _pl = commerce.build_payload(
+                                            {**_u_inp, "representativeImageUrl": _imgurls[0],
+                                             "optionalImageUrls": _imgurls[1:]}, status_type="WAIT")
+                                        _res = commerce.register_product(_pl, _tok)
+                                        st.success("업로드 완료 — 판매자센터에서 '판매대기' 상태로 확인하세요.")
+                                        st.json(_res)
+                                    except Exception as _ue:
+                                        st.error(f"업로드 실패: {_ue}")
+                        st.caption("※ 'WAIT(판매대기)'로만 등록됩니다 — 고객 노출 전, 판매자센터에서 확인 후 직접 '판매중'으로 전환하세요.")

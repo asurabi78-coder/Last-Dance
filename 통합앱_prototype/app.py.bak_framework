@@ -281,8 +281,6 @@ with t3:
     mode_13 = o1.checkbox("13섹션 감정여정", value=True, help="Hero→Pain→…→CTA 13섹션 고전환 구조")
     do_human = o2.checkbox("문체 정리(humanize)", value=True, help="번역투·AI관용구 제거(호출 1회 추가)")
     include_img = o3.checkbox("AI 대표이미지(B)", value=True, help="상단 대표이미지 생성(과금)")
-    _framework = st.selectbox("카피 방식(프레임워크)", ["PAS", "AIDA", "BAB"],
-                              help="PAS=문제·자극·해결 / AIDA=주목·흥미·욕구·행동 / BAB=비포·애프터·브릿지")
     _sp_thumb = (sp or {}).get("thumb") if sp else ""
     if _sp_thumb:
         tc1, tc2 = st.columns([1, 4])
@@ -379,7 +377,7 @@ with t3:
                 if use_real and ok:
                     try:
                         if mode_13:
-                            cr = copy_gpt.generate_13(pr_in or "상품", kw_in or "키워드", features=feat, provider=provider, framework=_framework)
+                            cr = copy_gpt.generate_13(pr_in or "상품", kw_in or "키워드", features=feat, provider=provider)
                         else:
                             cr = copy_gpt.generate(pr_in or "상품", kw_in or "키워드", features=feat, provider=provider)
                         if do_human:
@@ -501,30 +499,6 @@ with t3:
                     for _s in _ar["suggestions"]:
                         st.markdown(f"- {_s}")
             st.caption("※ 일반 전환율(CRO) 기준입니다. 네이버 검색노출(SEO)과는 별개입니다.")
-        with st.expander("🆎 헤드라인 A/B 변형"):
-            if st.button("헤드라인 2안 생성", key="ab_run"):
-                if use_real and (copy_gpt.available_openai() or copy_gpt.available_anthropic()):
-                    try:
-                        st.session_state["ab_result"] = copy_gpt.headline_ab(
-                            pr_in or cr.get("title", "상품"), kw_in or "키워드", features=feat, provider=provider)
-                    except Exception as _e:
-                        st.error(f"헤드라인 생성 실패: {_e}")
-                else:
-                    st.info("실데이터 OFF 또는 LLM 키 없음")
-            _ab = st.session_state.get("ab_result")
-            if _ab:
-                _vcols = st.columns(2)
-                for _vi, _v in enumerate(_ab["variants"]):
-                    with _vcols[_vi % 2]:
-                        st.markdown(f"**[{_v['label'] or ('안' + str(_vi + 1))}]**")
-                        st.markdown(f"### {_v['headline']}")
-                        if _v["sub"]:
-                            st.caption(_v["sub"])
-                        if st.button("이 헤드라인 적용", key=f"ab_apply_{_vi}"):
-                            st.session_state["copy_result"] = edit_util.apply_headline(cr, _v["headline"], _v["sub"])
-                            st.success("헤드라인을 카피에 반영했습니다. 위 미리보기가 갱신됩니다.")
-                            _safe_rerun()
-            st.caption("※ A/B 비교용 2안입니다. LLM 1회 호출(소량 과금).")
 
 # ----- ④ 이미지
 with t4:

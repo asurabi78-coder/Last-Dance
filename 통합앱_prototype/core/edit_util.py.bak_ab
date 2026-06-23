@@ -52,22 +52,3 @@ def apply_edits(cr, title=None, tags_text=None, section_edits=None):
         cr["sections"] = new_sections
     cr["edited"] = True
     return cr
-
-
-def apply_headline(cr, headline, sub=None):
-    """선택한 헤드라인을 카피에 반영. 13섹션이면 hero.headline(+sub), 단순이면 title. 새 dict 반환(원본 불변)."""
-    cr = dict(cr or {})
-    if cr.get("sections"):
-        new = []
-        for s in cr["sections"]:
-            s = dict(s)
-            if s.get("key") == "hero":
-                s["headline"] = str(headline)
-                if sub is not None:
-                    s["sub"] = str(sub)
-            new.append(s)
-        cr["sections"] = new
-    else:
-        cr["title"] = str(headline)
-    cr["edited"] = True
-    return cr
