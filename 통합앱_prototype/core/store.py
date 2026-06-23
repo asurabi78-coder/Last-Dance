@@ -136,3 +136,34 @@ def delete_detail(item_id):
         shutil.rmtree(folder, ignore_errors=True)
         return not os.path.exists(folder)
     return False
+
+
+def update_detail(item_id, cr, html="", meta=None):
+    """기존 저장 항목 덮어쓰기(id/created 유지, copy/html 갱신). 반환: 성공 여부.
+    hero.png 등 기존 파일은 유지(이미지 재생성 안 함)."""
+    import os, json
+    folder = os.path.join(SAVE_DIR, item_id)
+    meta_path = os.path.join(folder, "copy.json")
+    if not os.path.isfile(meta_path):
+        return False
+    try:
+        with open(meta_path, "r", encoding="utf-8") as f:
+            rec = json.load(f)
+    except Exception:
+        rec = {"id": item_id, "created_ts": 0}
+    meta = dict(meta or rec.get("meta") or {})
+    title = meta.get("상품명") or (cr or {}).get("title") or rec.get("title") or "상세페이지"
+    keyword = meta.get("키워드") or rec.get("keyword") or ""
+    rec["title"] = title
+    rec["keyword"] = keyword
+    rec["meta"] = meta
+    rec["copy"] = cr or {}
+    rec["has_image"] = os.path.isfile(os.path.join(folder, "hero.png"))
+    import time as _t
+    rec["updated"] = _t.strftime("%Y-%m-%d %H:%M:%S")
+    with open(meta_path, "w", encoding="utf-8") as f:
+        json.dump(rec, f, ensure_ascii=False, indent=2)
+    if html:
+        with open(os.path.join(folder, "page.html"), "w", encoding="utf-8") as f:
+            f.write(html)
+    return True

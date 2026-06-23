@@ -1,0 +1,217 @@
+# -*- coding: utf-8 -*-
+"""상세페이지 카피 — OpenAI/Anthropic.
+- generate(): 기존 단순 카피(하위호환)
+- generate_13(): 13섹션 감정여정 카피 (Hero→Pain→Problem→Story→Solution→How→Proof→Authority→Benefits→Risk→Compare→Filter→CTA)
+- humanize(): 한국어 AI 문체 제거(번역투/AI관용구/기계적 병렬 등), 의미·수치·고유명사 보존
+※ MoAI 스킬의 코드가 아닌, 공개 방법론(13섹션·PAS·번역투 제거)을 자체 구현한 것.
+"""
+import json
+import requests
+
+from . import config
+
+TIMEOUT = 90
+COPY_MAX_TOKENS = 8000   # 13섹션 등 대용량 JSON 출력 잘림 방지
+
+
+def available_openai():
+    return config.present("OPENAI_API_KEY")
+
+
+def available_anthropic():
+    return config.present("ANTHROPIC_API_KEY")
+
+
+def _chat_one(messages, provider, max_tokens=2200, json_mode=True):
+    """단일 provider 호출(폴백 없음)."""
+    if provider == "anthropic":
+        body = {"model": config.get("ANTHROPIC_MODEL", "claude-sonnet-4-6"),
+                "max_tokens": max_tokens,
+                "system": messages[0]["content"],
+                "messages": [{"role": "user", "content": messages[1]["content"]}]}
+        r = requests.post("https://api.anthropic.com/v1/messages",
+                          headers={"x-api-key": config.get("ANTHROPIC_API_KEY"),
+                                   "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                          json=body, timeout=TIMEOUT)
+        if r.status_code != 200:
+            raise RuntimeError(f"Anthropic {r.status_code}: {r.text[:160]}")
+        return r.json()["content"][0]["text"]
+    payload = {"model": config.OPENAI_MODEL, "messages": messages, "temperature": 0.7}
+    if json_mode:
+        payload["response_format"] = {"type": "json_object"}
+    r = requests.post("https://api.openai.com/v1/chat/completions",
+                      headers={"Authorization": f"Bearer {config.get('OPENAI_API_KEY')}",
+                               "Content-Type": "application/json"},
+                      json=payload, timeout=TIMEOUT)
+    if r.status_code != 200:
+        raise RuntimeError(f"OpenAI {r.status_code}: {r.text[:160]}")
+    return r.json()["choices"][0]["message"]["content"]
+
+
+def _chat(messages, provider, max_tokens=2200, json_mode=True):
+    """선택 엔진 우선 호출 → 실패 시 다른 엔진으로 자동 폴백.
+    provider='anthropic'이면 [anthropic→openai], 그 외 [openai→anthropic] 순서."""
+    order = ["anthropic", "openai"] if provider == "anthropic" else ["openai", "anthropic"]
+    errors = []
+    for pv in order:
+        if pv == "openai" and not available_openai():
+            continue
+        if pv == "anthropic" and not available_anthropic():
+            continue
+        try:
+            return _chat_one(messages, pv, max_tokens=max_tokens, json_mode=json_mode)
+        except Exception as e:
+            errors.append(f"{pv}: {str(e)[:120]}")
+    if errors:
+        raise RuntimeError("카피 LLM 모두 실패 → " + " / ".join(errors))
+    raise RuntimeError("사용 가능한 카피 LLM 없음(키 미설정)")
+
+
+def _parse_json(text):
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.strip("`")
+        text = text[text.find("{"):]
+    s, e = text.find("{"), text.rfind("}")
+    return json.loads(text[s:e + 1])
+
+
+# ---------- 기존 단순 카피(하위호환) ----------
+SYSTEM = ("당신은 한국 네이버 스마트스토어 상세페이지 카피라이터입니다. "
+          "키워드를 자연스럽게 녹이되 과장·허위·의학적 효능 표현은 피합니다. 반드시 JSON으로만 답합니다.")
+USER_TMPL = ('상품명: {product}\n키워드: {keyword}\n특징: {features}\n타깃: {target}\n\n'
+             '다음 JSON 스키마로 작성:\n'
+             '{{"title":"50자내 SEO 제목","bullets":["셀링포인트 4~5개"],'
+             '"body":"상세 설명 2~3문단(과장 금지)","tags":["검색 태그 8~10개"],'
+             '"image_brief":["촬영/이미지 구성안 4~5개"]}}')
+
+
+def generate(product, keyword, features="", target="", provider="openai"):
+    user = USER_TMPL.format(product=product, keyword=keyword,
+                            features=features or "-", target=target or "일반 소비자")
+    data = _parse_json(_chat([{"role": "system", "content": SYSTEM},
+                              {"role": "user", "content": user}], provider))
+    data["provider"] = provider
+    return data
+
+
+# ---------- 13섹션 감정여정 카피 ----------
+SECTION_ORDER = ["hero", "pain", "problem", "story", "solution", "how",
+                 "proof", "authority", "benefits", "risk", "compare", "filter", "cta"]
+SECTION_LABEL = {"hero": "Hero", "pain": "Pain", "problem": "Problem", "story": "Story",
+                 "solution": "Solution", "how": "How", "proof": "Proof", "authority": "Authority",
+                 "benefits": "Benefits", "risk": "Risk", "compare": "Compare", "filter": "Filter", "cta": "CTA"}
+
+SYSTEM_13 = (
+    "당신은 한국 이커머스 상세페이지 전문 카피라이터입니다. PAS(Problem-Agitate-Solution) 흐름과 "
+    "감정여정 13섹션 구조로 고전환 카피를 씁니다. 규칙: "
+    "①과장·허위·의학적 효능 금지(정보통신망법/표시광고법 의식) "
+    "②번역투(~를 통해/~에 대해/~에 있어서/이중 피동)·AI 관용구(결론적으로/혁신적인/~bar 시사하는)·기계적 병렬(첫째 둘째) 피하기 "
+    "③실제 사람이 쓴 자연스러운 한국어. 반드시 JSON으로만 답합니다."
+)
+USER_13 = (
+    '상품명: {product}\n키워드: {keyword}\n특징: {features}\n타깃: {target}\n\n'
+    '아래 13섹션 감정여정 카피를 JSON으로 작성. 각 섹션은 key/label/headline/sub/items(배열,없으면[])/note.\n'
+    '섹션 순서와 의도: hero(10초 가치+서브+CTA문구), pain(공감+고통점4), problem(반전훅+근본원인3), '
+    'story(Before→전환→After), solution(상품명+한줄솔루션+타겟핏), how(작동 3단계), proof(통계3+리뷰3), '
+    'authority(전문가/창업자 신뢰), benefits(혜택6), risk(보증+FAQ5), compare(Without3 vs With3), '
+    'filter(추천3/비추천3), cta(최종헤드라인+긴급성+CTA버튼).\n'
+    '추가로 title(50자내 SEO), tagline(한줄), tags(검색태그 8~10).\n'
+    '스키마: {{"title":"","tagline":"","tags":[],"sections":[{{"key":"hero","label":"Hero","headline":"","sub":"","items":[],"note":""}}]}}'
+)
+
+
+def generate_13(product, keyword, features="", target="", provider="openai"):
+    user = USER_13.format(product=product, keyword=keyword,
+                          features=features or "-", target=target or "일반 소비자")
+    data = _parse_json(_chat([{"role": "system", "content": SYSTEM_13},
+                              {"role": "user", "content": user}], provider, max_tokens=COPY_MAX_TOKENS))
+    # 섹션 정규화: 순서 보장 + 누락 채움
+    by_key = {}
+    for sec in data.get("sections", []):
+        k = str(sec.get("key", "")).lower().strip()
+        if k in SECTION_LABEL:
+            by_key[k] = sec
+    sections = []
+    for k in SECTION_ORDER:
+        s = by_key.get(k, {})
+        sections.append({"key": k, "label": SECTION_LABEL[k],
+                         "headline": s.get("headline", ""), "sub": s.get("sub", ""),
+                         "items": s.get("items", []) or [], "note": s.get("note", "")})
+    data["sections"] = sections
+    data["provider"] = provider
+    data.setdefault("title", product)
+    data.setdefault("tagline", "")
+    data.setdefault("tags", [])
+    return data
+
+
+# ---------- 한국어 문체 정리 ----------
+SYSTEM_HUMAN = (
+    "당신은 한국어 윤문 전문가입니다. 입력 JSON의 텍스트 필드에서 'AI 티'만 제거해 자연스러운 한국어로 다듬습니다. "
+    "제거 대상: 번역투(~를 통해/~에 대해/~에 있어서/~에 의해/이중 피동), AI 관용구(결론적으로/궁극적으로/혁신적인/~을 자랑하는/시사하는 바가), "
+    "기계적 병렬(첫째 둘째 셋째), 문두 접속사 남발, 형식명사 과다, 이모지·과한 불릿. "
+    "절대 규칙: 의미·사실·수치·고유명사·가격은 100% 보존. 구조(키)와 배열 길이 유지. 과윤문 금지. 반드시 같은 스키마 JSON으로만 답합니다."
+)
+
+
+def humanize(copy_dict, provider="openai"):
+    user = "다음 JSON의 텍스트를 위 규칙대로 윤문해 같은 구조 JSON으로 반환:\n" + json.dumps(copy_dict, ensure_ascii=False)
+    try:
+        out = _parse_json(_chat([{"role": "system", "content": SYSTEM_HUMAN},
+                                 {"role": "user", "content": user}], provider, max_tokens=COPY_MAX_TOKENS))
+        out["provider"] = copy_dict.get("provider", provider)
+        # 섹션 구조가 깨졌으면 원본 유지
+        if "sections" in copy_dict and len(out.get("sections", [])) != len(copy_dict["sections"]):
+            return copy_dict
+        out["humanized"] = True
+        return out
+    except Exception:
+        return copy_dict
+
+
+# ---------- 상품명 3안 + 해시태그 + 글자수/금지어 검증 (클린룸) ----------
+# 표시광고법/스마트스토어 가이드상 주의·금지 소지 표현(자체 작성, 확장 가능)
+BANNED_WORDS = [
+    "최저가", "최고", "최상", "1위", "넘버원", "no.1", "유일", "절대", "100%", "무조건",
+    "완벽", "완치", "특효", "부작용없", "의학적", "치료", "효능", "공식인증", "정품보장",
+    "당일완판", "품절임박", "마지막기회", "평생", "영구",
+]
+NAME_MAX = 50        # 스마트스토어 권장 상한
+NAME_TIGHT = 25      # 일부 채널(쿠팡 등) 권장 상한
+
+
+def check_name(name: str):
+    """상품명 글자수/금지어 검증(네트워크 불필요)."""
+    n = str(name or "")
+    low = n.replace(" ", "").lower()
+    hits = [w for w in BANNED_WORDS if w.replace(" ", "").lower() in low]
+    return {"길이": len(n), "권장초과(50)": len(n) > NAME_MAX,
+            "타이트초과(25)": len(n) > NAME_TIGHT, "금지어": hits, "통과": (len(n) <= NAME_MAX and not hits)}
+
+
+SYSTEM_NAME = (
+    "당신은 한국 스마트스토어 상품명/해시태그 카피라이터입니다. 검색 노출과 클릭률을 고려하되 "
+    "과장·허위·금지어(최저가/최고/1위/100%/효능 등)는 절대 쓰지 않습니다. 반드시 JSON으로만 답합니다."
+)
+USER_NAME = (
+    '키워드: {keyword}\n특징: {features}\n브랜드: {brand}\n타깃: {target}\n\n'
+    '상품명 3안과 해시태그를 JSON으로:\n'
+    '{{"names":[{{"유형":"검색최적화","상품명":"50자 이내, 핵심키워드 앞쪽 배치"}},'
+    '{{"유형":"클릭유도","상품명":""}},{{"유형":"브랜드","상품명":""}}],'
+    '"hashtags":["해시태그 15~30개(# 없이)"],"blog_titles":["블로그 SEO 제목 3개"]}}'
+)
+
+
+def product_names(keyword, features="", brand="", target="", provider="openai"):
+    user = USER_NAME.format(keyword=keyword, features=features or "-",
+                            brand=brand or "-", target=target or "일반 소비자")
+    data = _parse_json(_chat([{"role": "system", "content": SYSTEM_NAME},
+                              {"role": "user", "content": user}], provider, max_tokens=1200))
+    # 결정적 검증 부착
+    for item in data.get("names", []):
+        item["검증"] = check_name(item.get("상품명", ""))
+    data["provider"] = provider
+    data.setdefault("hashtags", [])
+    data.setdefault("blog_titles", [])
+    return data

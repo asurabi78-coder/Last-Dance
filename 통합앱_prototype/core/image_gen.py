@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import requests
 
-from . import config
+from . import config, usage
 
 TIMEOUT = 120
 EXPAND_MAX_WORKERS = 3   # 장면 동시 생성 수(이미지 API 429/과금 보호)
@@ -69,9 +69,19 @@ def generate_image(prompt, provider="auto"):
     for p in order:
         try:
             if p == "gemini" and available_gemini():
-                return _gemini(prompt), "Gemini"
+                _r = _gemini(prompt)
+                try:
+                    usage.record_image("gemini", config.GEMINI_IMAGE_MODEL, len(_r))
+                except Exception:
+                    pass
+                return _r, "Gemini"
             if p == "openai" and available_openai():
-                return _openai(prompt), "OpenAI(gpt-image-1)"
+                _r = _openai(prompt)
+                try:
+                    usage.record_image("openai", config.get("OPENAI_IMAGE_MODEL", "gpt-image-1"), len(_r))
+                except Exception:
+                    pass
+                return _r, "OpenAI(gpt-image-1)"
         except Exception as e:
             errors.append(str(e)[:120])
     raise RuntimeError(" / ".join(errors) or "사용 가능한 이미지 엔진 없음")
@@ -185,9 +195,19 @@ def edit_image(image_bytes, prompt, provider="auto"):
     for pv in order:
         try:
             if pv == "gemini" and available_gemini():
-                return _gemini_edit(image_bytes, prompt), "Gemini"
+                _r = _gemini_edit(image_bytes, prompt)
+                try:
+                    usage.record_image("gemini", config.GEMINI_IMAGE_MODEL, len(_r))
+                except Exception:
+                    pass
+                return _r, "Gemini"
             if pv == "openai" and available_openai():
-                return _openai_edit(image_bytes, prompt), "OpenAI(gpt-image-1)"
+                _r = _openai_edit(image_bytes, prompt)
+                try:
+                    usage.record_image("openai", config.get("OPENAI_IMAGE_MODEL", "gpt-image-1"), len(_r))
+                except Exception:
+                    pass
+                return _r, "OpenAI(gpt-image-1)"
         except Exception as e:
             errors.append(str(e)[:120])
     raise RuntimeError(" / ".join(errors) or "사용 가능한 편집 엔진 없음")

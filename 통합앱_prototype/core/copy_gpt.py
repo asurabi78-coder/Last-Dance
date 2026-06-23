@@ -8,7 +8,7 @@
 import json
 import requests
 
-from . import config
+from . import config, usage
 
 TIMEOUT = 90
 COPY_MAX_TOKENS = 8000   # 13섹션 등 대용량 JSON 출력 잘림 방지
@@ -35,7 +35,14 @@ def _chat_one(messages, provider, max_tokens=2200, json_mode=True):
                           json=body, timeout=TIMEOUT)
         if r.status_code != 200:
             raise RuntimeError(f"Anthropic {r.status_code}: {r.text[:160]}")
-        return r.json()["content"][0]["text"]
+        _j = r.json()
+        try:
+            _u = _j.get("usage", {})
+            usage.record_text("anthropic", config.get("ANTHROPIC_MODEL", "claude-sonnet-4-6"),
+                              _u.get("input_tokens", 0), _u.get("output_tokens", 0))
+        except Exception:
+            pass
+        return _j["content"][0]["text"]
     payload = {"model": config.OPENAI_MODEL, "messages": messages, "temperature": 0.7}
     if json_mode:
         payload["response_format"] = {"type": "json_object"}
@@ -45,7 +52,14 @@ def _chat_one(messages, provider, max_tokens=2200, json_mode=True):
                       json=payload, timeout=TIMEOUT)
     if r.status_code != 200:
         raise RuntimeError(f"OpenAI {r.status_code}: {r.text[:160]}")
-    return r.json()["choices"][0]["message"]["content"]
+    _j = r.json()
+    try:
+        _u = _j.get("usage", {})
+        usage.record_text("openai", config.OPENAI_MODEL,
+                          _u.get("prompt_tokens", 0), _u.get("completion_tokens", 0))
+    except Exception:
+        pass
+    return _j["choices"][0]["message"]["content"]
 
 
 def _chat(messages, provider, max_tokens=2200, json_mode=True):
