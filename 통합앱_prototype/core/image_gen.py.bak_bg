@@ -230,38 +230,3 @@ def expand_from_reference(image_bytes, scenes, provider="auto"):
     with ThreadPoolExecutor(max_workers=EXPAND_MAX_WORKERS) as ex:
         # map은 입력 순서대로 결과를 돌려줌 → 기존 반환 순서와 동일
         return list(ex.map(lambda s: _expand_one(image_bytes, s, provider), scenes))
-
-
-# ---------- 배경 다양화 프리셋(자체 작성) ----------
-BACKGROUND_PRESETS = {
-    "순백 스튜디오": "Keep this exact product unchanged (same shape, color, material, text, logo). Replace ONLY the background with a clean pure white seamless studio backdrop (#ffffff), soft even lighting. Photorealistic, soft natural shadows, professional e-commerce product shot. 1:1.",
-    "밝은 회색 스튜디오": "Keep this exact product unchanged (same shape, color, material, text, logo). Replace ONLY the background with a light neutral gray studio backdrop with gentle gradient. Photorealistic, soft natural shadows, professional e-commerce product shot. 1:1.",
-    "대리석": "Keep this exact product unchanged (same shape, color, material, text, logo). Replace ONLY the background with a polished white marble surface with subtle veining. Photorealistic, soft natural shadows, professional e-commerce product shot. 1:1.",
-    "우드 책상": "Keep this exact product unchanged (same shape, color, material, text, logo). Replace ONLY the background with a warm natural wood desk surface, cozy and minimal. Photorealistic, soft natural shadows, professional e-commerce product shot. 1:1.",
-    "파스텔 핑크": "Keep this exact product unchanged (same shape, color, material, text, logo). Replace ONLY the background with a soft pastel pink background, bright and clean. Photorealistic, soft natural shadows, professional e-commerce product shot. 1:1.",
-    "파스텔 블루": "Keep this exact product unchanged (same shape, color, material, text, logo). Replace ONLY the background with a soft pastel blue background, fresh and airy. Photorealistic, soft natural shadows, professional e-commerce product shot. 1:1.",
-    "그라데이션": "Keep this exact product unchanged (same shape, color, material, text, logo). Replace ONLY the background with a smooth modern color gradient backdrop, premium feel. Photorealistic, soft natural shadows, professional e-commerce product shot. 1:1.",
-    "야외 자연": "Keep this exact product unchanged (same shape, color, material, text, logo). Replace ONLY the background with an outdoor natural scene with greenery and soft daylight. Photorealistic, soft natural shadows, professional e-commerce product shot. 1:1.",
-    "카페 테이블": "Keep this exact product unchanged (same shape, color, material, text, logo). Replace ONLY the background with a stylish cafe table setting with blurred warm background. Photorealistic, soft natural shadows, professional e-commerce product shot. 1:1.",
-    "주방 라이프스타일": "Keep this exact product unchanged (same shape, color, material, text, logo). Replace ONLY the background with a bright modern kitchen lifestyle scene, natural light. Photorealistic, soft natural shadows, professional e-commerce product shot. 1:1.",
-    "미니멀 단색": "Keep this exact product unchanged (same shape, color, material, text, logo). Replace ONLY the background with a minimal solid muted-tone background with empty space for text. Photorealistic, soft natural shadows, professional e-commerce product shot. 1:1.",
-    "럭셔리 다크": "Keep this exact product unchanged (same shape, color, material, text, logo). Replace ONLY the background with a premium dark moody backdrop with focused spotlight. Photorealistic, soft natural shadows, professional e-commerce product shot. 1:1.",
-}
-
-
-def expand_backgrounds(image_bytes, presets, provider="auto"):
-    """선택한 배경 프리셋들로 상품 배경만 교체. [(preset, b64, engine|None, err|None)] 입력 순서대로 반환."""
-    presets = list(presets)
-    if not presets:
-        return []
-
-    def _one(name):
-        prompt = BACKGROUND_PRESETS.get(name, name)
-        try:
-            imgs, eng = edit_image(image_bytes, prompt, provider=provider)
-            return (name, imgs[0], eng, None)
-        except Exception as e:
-            return (name, None, None, str(e)[:120])
-
-    with ThreadPoolExecutor(max_workers=EXPAND_MAX_WORKERS) as ex:
-        return list(ex.map(_one, presets))

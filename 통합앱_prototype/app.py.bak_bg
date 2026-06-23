@@ -621,48 +621,6 @@ with t4:
                     st.session_state["section_images"] = simgs
                     st.success(f"{len(simgs)}장을 ③ 상세페이지 섹션에 배치 준비 완료 (③에서 자동 사용)")
         st.caption("주의: 제품 디테일(로고·글자)은 변형될 수 있어, 정품 디테일컷은 실사 권장.")
-    with st.expander("🎨 배경 다양화(상품 사진 → 여러 배경)", expanded=False):
-        _bgups = st.file_uploader("상품 사진 업로드", type=["jpg", "jpeg", "png", "webp"], key="bg_up")
-        _bg_use_thumb = st.checkbox("도매꾹 선택상품 썸네일 사용", value=False, key="bg_thumb")
-        _bg_sel = st.multiselect("배경 선택(여러 개)", list(image_gen.BACKGROUND_PRESETS.keys()),
-                                 default=["순백 스튜디오", "파스텔 핑크", "우드 책상"], key="bg_sel")
-        if st.button("배경 버전 생성", key="bg_btn"):
-            _bgref = None
-            if _bgups is not None:
-                _bgref = _bgups.getvalue()
-            elif _bg_use_thumb:
-                _sp3 = st.session_state.get("sourcing_pick")
-                _turl = ""
-                if "src_df" in st.session_state and _sp3:
-                    _m = st.session_state["src_df"]
-                    _m = _m[_m["상품후보"] == _sp3.get("product")]
-                    if not _m.empty:
-                        _turl = str(_m.iloc[0].get("썸네일") or "")
-                if _turl:
-                    try:
-                        _bgref = image_gen.fetch_image_bytes(_turl)
-                    except Exception as _e:
-                        st.error(f"썸네일 불러오기 실패: {_e}")
-            if not _bgref:
-                st.warning("사진을 업로드하거나, ②에서 상품 선택 후 '도매꾹 썸네일 사용'을 켜세요.")
-            elif not (use_real and (image_gen.available_gemini() or image_gen.available_openai())):
-                st.info("실데이터 OFF 또는 이미지 키 없음 → 생성 불가")
-            elif not _bg_sel:
-                st.warning("배경을 1개 이상 선택하세요.")
-            else:
-                st.image(_bgref, caption="기준 사진", width=200)
-                with st.spinner(f"{len(_bg_sel)}개 배경 생성 중…"):
-                    _bgres = image_gen.expand_backgrounds(_bgref, _bg_sel)
-                _bgcols = st.columns(2)
-                for _bi, (_pname, _b64, _eng, _err) in enumerate(_bgres):
-                    with _bgcols[_bi % 2]:
-                        if _b64:
-                            _bdata = image_gen.b64_to_bytes(_b64)
-                            st.image(_bdata, caption=f"{_pname} · {_eng}")
-                            st.download_button("저장", _bdata, f"bg_{_pname}.png", "image/png", key=f"bg_dl_{_bi}")
-                        else:
-                            st.error(f"{_pname} 실패: {_err}")
-        st.caption("※ 상품은 유지하고 배경만 교체합니다. 로고·글자가 있는 상품은 결과 확인 권장.")
     cr = st.session_state.get("copy_result")
     dp = ""
     if cr:
