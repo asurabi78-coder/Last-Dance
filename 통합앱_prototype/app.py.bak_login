@@ -17,31 +17,6 @@ import streamlit.components.v1 as components
 
 st.set_page_config(page_title="스마트스토어 통합 웹앱", page_icon="🛒", layout="wide")
 
-
-def _check_password():
-    """APP_PASSWORD 환경변수가 있으면 로그인 요구. 미설정이면 게이트 비활성(로컬용)."""
-    pw = config.get("APP_PASSWORD", "")
-    if not pw:
-        return True
-    if st.session_state.get("_authed"):
-        return True
-    st.title("🔒 로그인")
-    st.caption("이 앱은 비공개입니다. 비밀번호를 입력하세요.")
-    _pw_in = st.text_input("비밀번호", type="password", key="_login_pw")
-    if st.button("로그인", key="_login_btn"):
-        if _pw_in == pw:
-            st.session_state["_authed"] = True
-            _rr = getattr(st, "rerun", None) or getattr(st, "experimental_rerun", None)
-            if _rr:
-                _rr()
-        else:
-            st.error("비밀번호가 올바르지 않습니다.")
-    return False
-
-
-if not _check_password():
-    st.stop()
-
 KEYS = ["NAVER_AD_ACCESS_LICENSE", "NAVER_AD_SECRET_KEY", "NAVER_AD_CUSTOMER_ID",
         "NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET", "OPENAI_API_KEY", "ANTHROPIC_API_KEY",
         "GEMINI_API_KEY", "REMOVE_BG_API_KEY", "DOMEGGOOK_API_KEY",
