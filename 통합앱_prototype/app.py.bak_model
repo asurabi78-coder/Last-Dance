@@ -475,13 +475,6 @@ with t3:
                    "title_gap": int(_title_gap), "word_keep": _word_keep, "align": _align,
                    "hero_bg": _hero_bg, "hero_fg": _hero_fg, "accent": _accent}
         st.session_state["design_opts"] = _design
-        _has_vid = bool(st.session_state.get("product_video_url"))
-        _embed_vid = st.checkbox("🎬 상세페이지에 영상 삽입", value=False, key="embed_video",
-                                 disabled=not _has_vid,
-                                 help="④에서 만든 영상을 상세페이지 HTML에 넣습니다. 스마트스토어는 HTML 영상이 제거되니 '동영상 등록란'에 별도 업로드가 필요합니다.")
-        if _has_vid and not _embed_vid:
-            st.caption("ℹ️ ④에서 만든 영상이 있습니다. 위 체크박스를 켜면 상세페이지에 삽입됩니다.")
-        _vid_for_page = st.session_state.get("product_video_url", "") if (_has_vid and _embed_vid) else ""
         try:
             sec_imgs = st.session_state.get("section_images") or {}
             if sec_imgs:
@@ -489,12 +482,11 @@ with t3:
             if cr.get("sections"):
                 page = detail_template.build_detail_html_13(cr, hero_img=cr.get("hero", ""),
                                                             meta={"상품명": pr_in or cr.get("title", "")},
-                                                            section_images=sec_imgs, design=_design,
-                                                            video_url=_vid_for_page)
+                                                            section_images=sec_imgs, design=_design)
             else:
                 page = detail_template.build_detail_html(cr, hero_img=cr.get("hero", ""),
                                                          meta={"상품명": pr_in or cr.get("title", "")},
-                                                         design=_design, video_url=_vid_for_page)
+                                                         design=_design)
             components.html(page, height=1000, scrolling=True)
             st.download_button("상세페이지 HTML 다운로드", page.encode("utf-8"), "상세페이지.html", "text/html")
             _editing_id = st.session_state.get("editing_saved_id")
@@ -712,58 +704,6 @@ with t4:
                         else:
                             st.error(f"{_pname} 실패: {_err}")
         st.caption("※ 상품은 유지하고 배경만 교체합니다. 로고·글자가 있는 상품은 결과 확인 권장.")
-    with st.expander("👗 AI 모델 착용컷 (상품 → 사람이 착용한 전신)", expanded=False):
-        st.caption("상품 사진을 '사람이 착용한 컷'으로 만듭니다. ⚠️ 생성 특성상 상품 디테일(로고·패턴)이 다소 바뀔 수 있어요.")
-        _meng = st.radio("엔진", ["Gemini (저렴)", "GPT (gpt-image-1)"], horizontal=True, key="mdl_eng")
-        _mprov = "gemini" if _meng.startswith("Gemini") else "openai"
-        _msrc = st.radio("기준 이미지", ["사진 업로드", "도매꾹 썸네일", "③ 대표이미지"], horizontal=True, key="mdl_src")
-        _mup = None
-        if _msrc == "사진 업로드":
-            _mup = st.file_uploader("상품 사진", type=["jpg", "jpeg", "png", "webp"], key="mdl_up")
-        _msel = st.multiselect("만들 모델컷", list(image_gen.MODEL_PROMPTS.keys()),
-                               default=["여성 모델 전신"], key="mdl_sel")
-        if st.button("모델 착용컷 생성", key="mdl_btn"):
-            _mref, _merr = None, None
-            if _msrc == "사진 업로드":
-                if _mup is not None:
-                    _mref = _mup.getvalue()
-            elif _msrc == "도매꾹 썸네일":
-                _msp = st.session_state.get("sourcing_pick") or {}
-                _mtu = _msp.get("thumb", "")
-                if _mtu:
-                    try:
-                        _mref = image_gen.fetch_image_bytes(_mtu)
-                    except Exception as _e:
-                        _merr = str(_e)
-            else:
-                _mh = (st.session_state.get("copy_result") or {}).get("hero", "")
-                if isinstance(_mh, str) and _mh.startswith("data:image"):
-                    import base64 as _b64m
-                    try:
-                        _mref = _b64m.b64decode(_mh.split(",", 1)[1])
-                    except Exception as _e:
-                        _merr = str(_e)
-            if not _mref:
-                st.warning("기준 이미지를 찾을 수 없습니다. 사진을 업로드하거나 ②에서 상품을 선택하세요."
-                           + (" (" + _merr + ")" if _merr else ""))
-            elif not (use_real and (image_gen.available_gemini() or image_gen.available_openai())):
-                st.info("실데이터 OFF 또는 이미지 키 없음 → 생성 불가")
-            elif not _msel:
-                st.warning("만들 모델컷을 1개 이상 선택하세요.")
-            else:
-                st.image(_mref, caption="기준 상품 사진", width=180)
-                with st.spinner(str(len(_msel)) + "개 모델컷 생성 중…"):
-                    _mres = image_gen.expand_models(_mref, _msel, provider=_mprov)
-                _mcols = st.columns(2)
-                for _mi, (_mn, _mb64, _meng2, _merr2) in enumerate(_mres):
-                    with _mcols[_mi % 2]:
-                        if _mb64:
-                            _mdata = image_gen.b64_to_bytes(_mb64)
-                            st.image(_mdata, caption=_mn + " · " + str(_meng2))
-                            st.download_button("저장", _mdata, "model_" + _mn + ".png", "image/png", key="mdl_dl_" + str(_mi))
-                        else:
-                            st.error(_mn + " 실패: " + str(_merr2))
-        st.caption("※ 사람·얼굴이 생성됩니다. 실제 상품과 다를 수 있어, 정확한 착용감은 실사 촬영을 권장합니다.")
     with st.expander("🎬 상품 영상 생성 (베타 · fal.ai Kling)", expanded=False):
         if not video_gen.available():
             st.info("FAL_KEY가 .env에 없습니다. fal.ai 키를 넣으면 영상 생성이 활성화됩니다.")

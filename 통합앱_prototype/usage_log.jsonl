@@ -36,3 +36,10 @@
 {"ts": 1782272067.428703, "date": "2026-06-24", "provider": "openai", "model": "gpt-image-1", "kind": "image", "in_tokens": 0, "out_tokens": 0, "images": 1, "cost": 0.04}
 {"ts": 1782272071.4469342, "date": "2026-06-24", "provider": "openai", "model": "gpt-4o-mini", "kind": "text", "in_tokens": 528, "out_tokens": 1530, "images": 0, "cost": 0.000997}
 {"ts": 1782272093.4666843, "date": "2026-06-24", "provider": "openai", "model": "gpt-4o-mini", "kind": "text", "in_tokens": 1564, "out_tokens": 1347, "images": 0, "cost": 0.001043}
+{"ts": 1782272215.93488, "date": "2026-06-24", "provider": "openai", "model": "gpt-image-1", "kind": "image", "in_tokens": 0, "out_tokens": 0, "images": 1, "cost": 0.04}
+{"ts": 1782272220.3701327, "date": "2026-06-24", "provider": "openai", "model": "gpt-image-1", "kind": "image", "in_tokens": 0, "out_tokens": 0, "images": 1, "cost": 0.04}
+{"ts": 1782272220.64005, "date": "2026-06-24", "provider": "openai", "model": "gpt-image-1", "kind": "image", "in_tokens": 0, "out_tokens": 0, "images": 1, "cost": 0.04}
+{"ts": 1782272286.0063987, "date": "2026-06-24", "provider": "openai", "model": "gpt-image-1", "kind": "image", "in_tokens": 0, "out_tokens": 0, "images": 1, "cost": 0.04}
+{"ts": 1782272331.992188, "date": "2026-06-24", "provider": "openai", "model": "gpt-image-1", "kind": "image", "in_tokens": 0, "out_tokens": 0, "images": 1, "cost": 0.04}
+{"ts": 1782272332.0788727, "date": "2026-06-24", "provider": "openai", "model": "gpt-image-1", "kind": "image", "in_tokens": 0, "out_tokens": 0, "images": 1, "cost": 0.04}
+{"ts": 1782272332.2095644, "date": "2026-06-24", "provider": "openai", "model": "gpt-image-1", "kind": "image", "in_tokens": 0, "out_tokens": 0, "images": 1, "cost": 0.04}

@@ -265,31 +265,3 @@ def expand_backgrounds(image_bytes, presets, provider="auto"):
 
     with ThreadPoolExecutor(max_workers=EXPAND_MAX_WORKERS) as ex:
         return list(ex.map(_one, presets))
-
-
-# ---------- AI 모델 착용 풀샷(상품 사진 → 사람이 착용한 전신컷) ----------
-MODEL_PROMPTS = {
-    "여성 모델 전신": "Full-body fashion lookbook photo of a Korean female model wearing this exact product, natural pretty face, clean neutral studio background, soft daylight, relaxed standing pose, full body visible head to toe. Keep the product's color, shape, pattern and design faithful to the reference. Vertical 3:4, photorealistic.",
-    "남성 모델 전신": "Full-body fashion lookbook photo of a Korean male model wearing this exact product, natural face, clean neutral studio background, soft daylight, relaxed standing pose, full body visible head to toe. Keep the product's color, shape, pattern and design faithful to the reference. Vertical 3:4, photorealistic.",
-    "신발 착용 전신": "Full-body street-style photo of a model wearing these exact shoes with a simple coordinated outfit, full body head to toe with the shoes clearly visible, natural daylight. Keep the shoes' color, shape and design faithful to the reference. Vertical 3:4, photorealistic.",
-    "야외 룩북": "Full-body outdoor lookbook photo of a model wearing this exact product, natural park/city background, golden-hour daylight, candid walking pose, full body visible head to toe. Keep the product faithful to the reference. Vertical 3:4, photorealistic.",
-    "상반신 착용컷": "Upper-body/half-body photo of a model wearing this exact product, natural face, clean studio background, soft lighting, showing how the product looks when worn. Keep the product faithful to the reference. Vertical 4:5, photorealistic.",
-}
-
-
-def expand_models(image_bytes, presets, provider="auto"):
-    """상품 사진 → 모델이 착용한 컷. [(preset, b64, engine|None, err|None)] 입력 순서대로 반환."""
-    presets = list(presets)
-    if not presets:
-        return []
-
-    def _one(name):
-        prompt = MODEL_PROMPTS.get(name, name)
-        try:
-            imgs, eng = edit_image(image_bytes, prompt, provider=provider)
-            return (name, imgs[0], eng, None)
-        except Exception as e:
-            return (name, None, None, str(e)[:120])
-
-    with ThreadPoolExecutor(max_workers=EXPAND_MAX_WORKERS) as ex:
-        return list(ex.map(_one, presets))
