@@ -435,30 +435,21 @@ with t3:
         if cr.get("hero"):
             tag += f" · 이미지 {cr.get('hero_engine','')}"
         st.caption("생성: " + tag)
-        # ✏️ 제목 직접 편집 — 커서로 글자 수정, Enter로 원하는 위치에서 줄바꿈
-        _nonce = st.session_state.get("edit_nonce", 0)
-        _title_edit = st.text_area(
-            "✏️ 제목 직접 편집 (커서로 수정 · Enter로 원하는 위치에서 줄바꿈)",
-            value=cr.get("title", ""), key=f"title_edit_{_nonce}", height=90,
-            help="여기서 글자를 직접 고치고, 줄을 바꾸고 싶은 자리에서 Enter를 치면 미리보기 제목이 딱 그 위치에서 줄바꿈됩니다.")
-        if _title_edit != cr.get("title", ""):
-            cr["title"] = _title_edit
-            st.session_state["copy_result"] = cr
-        # 🎨 디자인 조정 — ＋/－ 버튼으로 한 칸씩 미세조절
+        # 🎨 디자인 조정 — 값만 바꾸면 아래 미리보기에 바로 반영됩니다.
         _DEF = detail_template.DESIGN_DEFAULTS
-        with st.expander("🎨 디자인 조정 (크기·여백·색상 — ＋/－로 한 칸씩 미세조절)"):
+        with st.expander("🎨 디자인 조정 (제목·여백·색상을 직접 바꾸세요)"):
             _dc1, _dc2, _dc3 = st.columns(3)
-            _title_size = _dc1.number_input("제목 크기", 16, 80, _DEF["title_size"], 1, key="d_title_size")
-            _sub_size = _dc2.number_input("부제목 크기", 10, 32, _DEF["sub_size"], 1, key="d_sub_size")
-            _sec_size = _dc3.number_input("섹션제목 크기", 14, 48, _DEF["sec_size"], 1, key="d_sec_size")
+            _title_size = _dc1.slider("제목 크기", 24, 64, _DEF["title_size"], key="d_title_size")
+            _sub_size = _dc2.slider("부제목 크기", 12, 28, _DEF["sub_size"], key="d_sub_size")
+            _sec_size = _dc3.slider("섹션제목 크기", 16, 40, _DEF["sec_size"], key="d_sec_size")
             _dd1, _dd2, _dd3 = st.columns(3)
-            _body_size = _dd1.number_input("본문 크기", 10, 28, _DEF["body_size"], 1, key="d_body_size")
-            _line_h = _dd2.number_input("제목 줄간격", 0.8, 2.5, _DEF["line_height"], 0.05, format="%.2f", key="d_lh")
-            _letter_s = _dd3.number_input("자간(em)", -0.10, 0.20, _DEF["letter_spacing"], 0.005, format="%.3f", key="d_ls")
+            _body_size = _dd1.slider("본문 크기", 12, 22, _DEF["body_size"], key="d_body_size")
+            _line_h = _dd2.slider("제목 줄간격", 1.0, 2.0, _DEF["line_height"], 0.05, key="d_lh")
+            _letter_s = _dd3.slider("자간(em)", -0.05, 0.10, _DEF["letter_spacing"], 0.005, key="d_ls")
             _de1, _de2, _de3 = st.columns(3)
-            _title_gap = _de1.number_input("제목 아래 여백", 0, 80, _DEF["title_gap"], 1, key="d_gap")
+            _title_gap = _de1.slider("제목 아래 여백", 0, 48, _DEF["title_gap"], key="d_gap")
             _word_keep = _de2.checkbox("단어 안 끊기(keep-all)", value=_DEF["word_keep"], key="d_keep",
-                                       help="켜면 단어 중간에서 줄바꿈되지 않습니다. (Enter로 직접 넣은 줄바꿈은 항상 유지)")
+                                       help="켜면 '스타일과'처럼 단어 중간에서 줄바꿈되지 않고 띄어쓰기 단위로만 넘어갑니다.")
             _align = _de3.radio("정렬", ["center", "left"], index=0, horizontal=True, key="d_align")
             _df1, _df2, _df3 = st.columns(3)
             _hero_bg = _df1.color_picker("배경색", _DEF["hero_bg"], key="d_bg")
@@ -470,9 +461,9 @@ with t3:
                     st.session_state.pop(_k, None)
                 st.session_state.pop("design_opts", None)
                 _safe_rerun()
-        _design = {"title_size": int(_title_size), "sub_size": int(_sub_size), "sec_size": int(_sec_size),
-                   "body_size": int(_body_size), "line_height": float(_line_h), "letter_spacing": float(_letter_s),
-                   "title_gap": int(_title_gap), "word_keep": _word_keep, "align": _align,
+        _design = {"title_size": _title_size, "sub_size": _sub_size, "sec_size": _sec_size,
+                   "body_size": _body_size, "line_height": _line_h, "letter_spacing": _letter_s,
+                   "title_gap": _title_gap, "word_keep": _word_keep, "align": _align,
                    "hero_bg": _hero_bg, "hero_fg": _hero_fg, "accent": _accent}
         st.session_state["design_opts"] = _design
         try:

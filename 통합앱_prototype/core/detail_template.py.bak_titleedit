@@ -76,9 +76,7 @@ def build_detail_html(copy: dict, hero_img: str = "", meta: dict = None, design:
     """copy: {title,bullets,body,tags,image_brief,...}, hero_img: data URI 또는 URL, meta: 사양 dict"""
     copy = copy or {}
     meta = meta or {}
-    _raw_title = str(copy.get("title", "상품 상세페이지") or "")
-    title = _e(_raw_title).replace("\r\n", "\n").replace("\n", " ")          # 한 줄용(타이틀/섹션/CTA)
-    title_html = _e(_raw_title).replace("\r\n", "\n").replace("\n", "<br>")  # 히어로 제목용(직접 줄바꿈 반영)
+    title = _e(copy.get("title", "상품 상세페이지"))
     body = _e(copy.get("body", ""))
     bullets = [b for b in (copy.get("bullets") or []) if b][:4]
     feats = [f for f in (copy.get("image_brief") or copy.get("bullets") or []) if f][:3]
@@ -148,7 +146,7 @@ td .fill{{color:#cd2e3a;font-weight:600;}}
 @media(max-width:560px){{.points,.frow{{grid-template-columns:1fr;}}}}
 {design_css}
 </style></head><body><div class="wrap">
-<header class="hero"><h1>{title_html}</h1><p class="tag">{tagline}</p>
+<header class="hero"><h1>{title}</h1><p class="tag">{tagline}</p>
 <div class="badges">{badges}</div>{hero_visual}</header>
 <section class="pad center"><div class="kicker">Product</div><h2 class="sec">{title}</h2><div class="rule"></div>
 <p class="lead">{body}</p></section>
@@ -170,9 +168,7 @@ def build_detail_html_13(copy: dict, hero_img: str = "", meta: dict = None, sect
     copy = copy or {}
     meta = meta or {}
     section_images = section_images or {}
-    _raw_title = str(copy.get("title", "상품 상세페이지") or "")
-    title = _e(_raw_title).replace("\r\n", "\n").replace("\n", " ")
-    title_html = _e(_raw_title).replace("\r\n", "\n").replace("\n", "<br>")
+    title = _e(copy.get("title", "상품 상세페이지"))
     tagline = _e(copy.get("tagline", ""))
     tags = [t for t in (copy.get("tags") or []) if t]
     badges = "".join(f"<span class='badge'>{_e(t)}</span>" for t in tags[:5])
@@ -221,7 +217,7 @@ def build_detail_html_13(copy: dict, hero_img: str = "", meta: dict = None, sect
     return f"""<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>{title}</title>
 <style>{css}</style></head><body><div class="wrap">
-<header class="hero"><h1>{title_html}</h1>{('<p class=tag>'+tagline+'</p>') if tagline else ''}
+<header class="hero"><h1>{title}</h1>{('<p class=tag>'+tagline+'</p>') if tagline else ''}
 <div class="badges">{badges}</div>{hero_visual}</header>
 {blocks}
 <section class="pad"><div class="center"><div class="kicker">Information</div><h2 class="sec">상품 정보</h2><div class="rule"></div></div>
