@@ -12,7 +12,7 @@ import pandas as pd
 import streamlit as st
 
 from concurrent.futures import ThreadPoolExecutor
-from core import config, naver_keyword, sourcing, copy_gpt, image_gen, detail_template, datalab_rank, store, batch, commerce, edit_util, usage, cro, naver_seo, video_gen
+from core import config, naver_keyword, sourcing, copy_gpt, image_gen, detail_template, datalab_rank, store, batch, commerce, edit_util, usage, cro, naver_seo
 import streamlit.components.v1 as components
 
 st.set_page_config(page_title="스마트스토어 통합 웹앱", page_icon="🛒", layout="wide")
@@ -45,7 +45,7 @@ if not _check_password():
 KEYS = ["NAVER_AD_ACCESS_LICENSE", "NAVER_AD_SECRET_KEY", "NAVER_AD_CUSTOMER_ID",
         "NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET", "OPENAI_API_KEY", "ANTHROPIC_API_KEY",
         "GEMINI_API_KEY", "REMOVE_BG_API_KEY", "DOMEGGOOK_API_KEY",
-        "NAVER_COMMERCE_CLIENT_ID", "NAVER_COMMERCE_CLIENT_SECRET", "FAL_KEY"]
+        "NAVER_COMMERCE_CLIENT_ID", "NAVER_COMMERCE_CLIENT_SECRET"]
 
 CATEGORIES = ["(선택 안 함)", "패션의류", "패션잡화", "화장품/미용", "디지털/가전",
               "가구/인테리어", "출산/육아", "식품", "스포츠/레저", "생활/건강",
@@ -704,62 +704,6 @@ with t4:
                         else:
                             st.error(f"{_pname} 실패: {_err}")
         st.caption("※ 상품은 유지하고 배경만 교체합니다. 로고·글자가 있는 상품은 결과 확인 권장.")
-    with st.expander("🎬 상품 영상 생성 (베타 · fal.ai Kling)", expanded=False):
-        if not video_gen.available():
-            st.info("FAL_KEY가 .env에 없습니다. fal.ai 키를 넣으면 영상 생성이 활성화됩니다.")
-        else:
-            st.caption("⚠️ 영상은 유료입니다(모델·길이에 따라 5초 한 편 수백~천원대). 생성에 1~3분 걸리니 창을 닫지 마세요.")
-            _vsrc = st.radio("기준 이미지", ["③ 대표이미지", "도매꾹 썸네일", "사진 업로드"],
-                             horizontal=True, key="vid_src")
-            _vup = None
-            if _vsrc == "사진 업로드":
-                _vup = st.file_uploader("상품 사진", type=["jpg", "jpeg", "png", "webp"], key="vid_up")
-            _vmodel = st.selectbox("모델", list(video_gen.MODELS.keys()), key="vid_model")
-            _vdur = st.radio("길이(초)", ["5", "10"], horizontal=True, key="vid_dur", help="길수록 비쌉니다")
-            _vprompt = st.text_area("영상 연출 프롬프트 (영어 권장)", value=video_gen.DEFAULT_PROMPT,
-                                    key="vid_prompt", height=80)
-            if st.button("🎬 영상 생성", key="vid_btn", type="primary"):
-                _vbytes, _verr = None, None
-                if _vsrc == "사진 업로드":
-                    if _vup is not None:
-                        _vbytes = _vup.getvalue()
-                elif _vsrc == "③ 대표이미지":
-                    _hero = (st.session_state.get("copy_result") or {}).get("hero", "")
-                    if isinstance(_hero, str) and _hero.startswith("data:image"):
-                        import base64 as _b64v
-                        try:
-                            _vbytes = _b64v.b64decode(_hero.split(",", 1)[1])
-                        except Exception as _e:
-                            _verr = str(_e)
-                else:
-                    _spv = st.session_state.get("sourcing_pick") or {}
-                    _tu = _spv.get("thumb", "")
-                    if _tu:
-                        try:
-                            _vbytes = image_gen.fetch_image_bytes(_tu)
-                        except Exception as _e:
-                            _verr = str(_e)
-                if not _vbytes:
-                    st.warning("기준 이미지를 찾을 수 없습니다. ③에서 대표이미지를 만들거나 사진을 업로드하세요."
-                               + (" (" + _verr + ")" if _verr else ""))
-                else:
-                    st.image(_vbytes, caption="기준 이미지", width=200)
-                    _vlog = st.empty()
-                    with st.spinner("영상 생성 중… 1~3분 걸립니다(창을 닫지 마세요)"):
-                        _vurl, _veng, _vwarn = video_gen.generate_video(
-                            image_bytes=_vbytes, prompt=_vprompt, duration=_vdur,
-                            model=video_gen.MODELS[_vmodel],
-                            on_log=lambda m: _vlog.caption(str(m)[:120]))
-                    if _vurl:
-                        st.session_state["product_video_url"] = _vurl
-                        st.success("영상 생성 완료 · " + str(_veng))
-                    else:
-                        st.error("영상 생성 실패: " + str(_vwarn))
-            _vu = st.session_state.get("product_video_url")
-            if _vu:
-                st.video(_vu)
-                st.markdown("[⬇️ 영상(mp4) 열기/저장](" + _vu + ")")
-                st.caption("스마트스토어 상세 HTML엔 영상이 안 들어갑니다 → 상품등록 시 '동영상' 등록란에 이 mp4를 올리세요.")
     cr = st.session_state.get("copy_result")
     dp = ""
     if cr:

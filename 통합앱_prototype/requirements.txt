@@ -5,3 +5,4 @@ requests
 openpyxl
 pillow
 bcrypt
+fal-client
