@@ -72,6 +72,19 @@ def _design_css(design: dict) -> str:
     return "".join(rules)
 
 
+def _gallery_section(section_images) -> str:
+    """간단 모드용: 생성 이미지들을 '상세 이미지' 갤러리로 렌더(없으면 빈 문자열)."""
+    imgs = [v for v in (section_images or {}).values() if v]
+    if not imgs:
+        return ""
+    cards = "".join(
+        "<img src='" + _e(u) + "' alt='detail' "
+        "style='width:100%;border-radius:14px;margin-top:14px'/>" for u in imgs)
+    return ("<section class='pad center'><div class='kicker'>Detail</div>"
+            "<h2 class='sec'>상세 이미지</h2><div class='rule'></div>"
+            "<div style='max-width:680px;margin:0 auto'>" + cards + "</div></section>")
+
+
 def _video_section(video_url: str) -> str:
     """영상 URL이 있으면 상세페이지에 <video> 섹션을 렌더(없으면 빈 문자열)."""
     if not video_url:
@@ -84,7 +97,7 @@ def _video_section(video_url: str) -> str:
             "src='" + u + "'></video></section>")
 
 
-def build_detail_html(copy: dict, hero_img: str = "", meta: dict = None, design: dict = None, video_url: str = "") -> str:
+def build_detail_html(copy: dict, hero_img: str = "", meta: dict = None, design: dict = None, video_url: str = "", section_images: dict = None) -> str:
     """copy: {title,bullets,body,tags,image_brief,...}, hero_img: data URI 또는 URL, meta: 사양 dict"""
     copy = copy or {}
     meta = meta or {}
@@ -124,6 +137,7 @@ def build_detail_html(copy: dict, hero_img: str = "", meta: dict = None, design:
     tag_line = " ".join("#" + _e(t) for t in tags)
     design_css = _design_css(design)
     video_html = _video_section(video_url)
+    gallery_html = _gallery_section(section_images)
 
     return f"""<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>{title}</title>
@@ -166,6 +180,7 @@ td .fill{{color:#cd2e3a;font-weight:600;}}
 <section class="pad center"><div class="kicker">Product</div><h2 class="sec">{title}</h2><div class="rule"></div>
 <p class="lead">{body}</p></section>
 <section class="pad" style="padding-top:0;">{main_slot}</section>
+{gallery_html}
 {video_html}
 <section class="pad" style="padding-top:0;"><div class="center"><div class="kicker">Key Point</div><h2 class="sec">핵심 포인트</h2><div class="rule"></div></div>
 <div class="points">{points}</div></section>
@@ -202,7 +217,7 @@ def build_detail_html_13(copy: dict, hero_img: str = "", meta: dict = None, sect
         sub = _e(sec.get("sub", ""))
         items = [i for i in (sec.get("items") or []) if i]
         note = _e(sec.get("note", ""))
-        if not (hl or sub or items or note):
+        if not (hl or sub or items or note or section_images.get(k)):
             continue
         lis = "".join(f"<li>{_e(i)}</li>" for i in items)
         items_html = f"<ul class='dlist'>{lis}</ul>" if lis else ""

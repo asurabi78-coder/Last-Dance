@@ -494,7 +494,8 @@ with t3:
             else:
                 page = detail_template.build_detail_html(cr, hero_img=cr.get("hero", ""),
                                                          meta={"상품명": pr_in or cr.get("title", "")},
-                                                         design=_design, video_url=_vid_for_page)
+                                                         design=_design, video_url=_vid_for_page,
+                                                         section_images=sec_imgs)
             components.html(page, height=1000, scrolling=True)
             st.download_button("상세페이지 HTML 다운로드", page.encode("utf-8"), "상세페이지.html", "text/html")
             _editing_id = st.session_state.get("editing_saved_id")
