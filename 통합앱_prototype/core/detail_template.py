@@ -72,6 +72,20 @@ def _design_css(design: dict) -> str:
     return "".join(rules)
 
 
+def _item_text(it):
+    """섹션 items가 dict로 와도 안전하게 문자열로 변환."""
+    if isinstance(it, dict):
+        for _k in ("title", "name", "text", "headline", "label", "prompt", "content", "value"):
+            _v = it.get(_k)
+            if _v:
+                return str(_v)
+        for _v in it.values():
+            if isinstance(_v, str) and _v.strip():
+                return _v
+        return ""
+    return "" if it is None else str(it)
+
+
 def _gallery_section(section_images) -> str:
     """간단 모드용: 생성 이미지들을 '상세 이미지' 갤러리로 렌더(없으면 빈 문자열)."""
     imgs = [v for v in (section_images or {}).values() if v]
@@ -215,7 +229,7 @@ def build_detail_html_13(copy: dict, hero_img: str = "", meta: dict = None, sect
             continue
         hl = _e(sec.get("headline", ""))
         sub = _e(sec.get("sub", ""))
-        items = [i for i in (sec.get("items") or []) if i]
+        items = [t for t in (_item_text(i) for i in (sec.get("items") or [])) if t]
         note = _e(sec.get("note", ""))
         if not (hl or sub or items or note or section_images.get(k)):
             continue

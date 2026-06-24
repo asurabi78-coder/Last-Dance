@@ -70,6 +70,25 @@ def _safe_rerun():
         fn()
 
 
+def _item_text(it):
+    """카피 항목이 dict로 와도 안전하게 문자열로 변환(크래시 방지)."""
+    if isinstance(it, dict):
+        for _k in ("title", "name", "text", "headline", "label", "prompt", "content", "value"):
+            _v = it.get(_k)
+            if _v:
+                return str(_v)
+        for _v in it.values():
+            if isinstance(_v, str) and _v.strip():
+                return _v
+        return ""
+    return "" if it is None else str(it)
+
+
+def _items_lines(items):
+    """items 리스트 → 문자열 리스트(빈 값 제거). dict 항목 안전 처리."""
+    return [t for t in (_item_text(i) for i in (items or [])) if t]
+
+
 def mock_keywords(seed):
     base = (seed or "키워드").strip()
     random.seed(base)
@@ -537,23 +556,23 @@ with t3:
                         st.markdown(f"**[{sec.get('label','')}]** {sec.get('headline','')}")
                         if sec.get("sub"):
                             st.caption(sec["sub"])
-                        for it in sec.get("items", []):
+                        for it in _items_lines(sec.get("items")):
                             st.markdown(f"- {it}")
             else:
                 st.markdown("**셀링포인트:**\n" + "\n".join(f"- {b}" for b in cr.get("bullets", [])))
                 st.markdown(f"**상세:** {cr.get('body','')}")
-            st.markdown("**태그:** " + " ".join("#"+t for t in cr.get("tags", [])))
+            st.markdown("**태그:** " + " ".join("#" + t for t in _items_lines(cr.get("tags"))))
         with st.expander("✏️ 카피 수정"):
             _nz = st.session_state.get("edit_nonce", 0)
             _ed_title = st.text_input("제목", value=cr.get("title", ""), key=f"ed_title_{_nz}")
-            _ed_tags = st.text_input("태그(쉼표)", value=", ".join(cr.get("tags", []) or []), key=f"ed_tags_{_nz}")
+            _ed_tags = st.text_input("태그(쉼표)", value=", ".join(_items_lines(cr.get("tags"))), key=f"ed_tags_{_nz}")
             _sec_edits = {}
             for _sec in (cr.get("sections") or []):
                 _k = _sec.get("key")
                 st.markdown(f"**[{_sec.get('label','')}]**")
                 _h = st.text_input("헤드라인", value=_sec.get("headline", ""), key=f"ed_h_{_nz}_{_k}")
                 _sub = st.text_input("서브", value=_sec.get("sub", ""), key=f"ed_s_{_nz}_{_k}")
-                _items = st.text_area("항목(줄바꿈)", value="\n".join(_sec.get("items", []) or []),
+                _items = st.text_area("항목(줄바꿈)", value="\n".join(_items_lines(_sec.get("items"))),
                                       key=f"ed_i_{_nz}_{_k}", height=68)
                 _sec_edits[_k] = {"headline": _h, "sub": _sub, "items_text": _items}
             if st.button("수정 적용", key=f"ed_apply_{_nz}"):

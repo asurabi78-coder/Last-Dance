@@ -13,6 +13,24 @@ BANNED_WORDS = [
 URGENCY_HINTS = ["지금", "오늘", "한정", "마감", "바로", "조기", "선착순", "재입고"]
 
 
+def _item_text(it):
+    """items가 dict로 와도 안전하게 문자열로 변환."""
+    if isinstance(it, dict):
+        for _k in ("title", "name", "text", "headline", "label", "prompt", "content", "value"):
+            _v = it.get(_k)
+            if _v:
+                return str(_v)
+        for _v in it.values():
+            if isinstance(_v, str) and _v.strip():
+                return _v
+        return ""
+    return "" if it is None else str(it)
+
+
+def _norm_items(items):
+    return [t for t in (_item_text(i) for i in (items or [])) if t]
+
+
 def _sec_map(cr):
     return {s.get("key"): s for s in (cr.get("sections") or []) if isinstance(s, dict)}
 
@@ -21,7 +39,7 @@ def _all_text(cr):
     parts = [str(cr.get("title", "")), str(cr.get("tagline", ""))]
     for s in (cr.get("sections") or []):
         parts += [str(s.get("headline", "")), str(s.get("sub", "")), str(s.get("note", ""))]
-        parts += [str(x) for x in (s.get("items") or [])]
+        parts += _norm_items(s.get("items"))
     parts += [str(x) for x in (cr.get("bullets") or [])]
     parts.append(str(cr.get("body", "")))
     return " ".join(parts)
@@ -86,7 +104,7 @@ def audit(cr):
         checks.append(_check("최종 CTA", bool(str(cta.get("headline", "")).strip()), 3,
                              "마무리 CTA가 있습니다.",
                              "최종 CTA 헤드라인이 비어 있습니다."))
-        cta_text = (str(cta.get("headline", "")) + str(cta.get("sub", "")) + " ".join(cta.get("items") or [])).replace(" ", "")
+        cta_text = (str(cta.get("headline", "")) + str(cta.get("sub", "")) + " ".join(_norm_items(cta.get("items")))).replace(" ", "")
         checks.append(_check("긴급성 문구", any(u in cta_text for u in URGENCY_HINTS), 2,
                              "행동을 앞당기는 긴급성 표현이 있습니다.",
                              "CTA에 긴급성(지금/오늘/한정 등) 표현이 약합니다.", warn=True))

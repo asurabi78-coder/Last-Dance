@@ -142,6 +142,24 @@ FRAMEWORKS = {
 }
 
 
+def _item_text(it):
+    """카피 items가 dict로 와도 안전하게 문자열로 변환."""
+    if isinstance(it, dict):
+        for _k in ("title", "name", "text", "headline", "label", "prompt", "content", "value"):
+            _v = it.get(_k)
+            if _v:
+                return str(_v)
+        for _v in it.values():
+            if isinstance(_v, str) and _v.strip():
+                return _v
+        return ""
+    return "" if it is None else str(it)
+
+
+def _norm_items(items):
+    return [t for t in (_item_text(i) for i in (items or [])) if t]
+
+
 def generate_13(product, keyword, features="", target="", provider="openai", framework="PAS"):
     user = USER_13.format(product=product, keyword=keyword,
                           features=features or "-", target=target or "일반 소비자")
@@ -159,7 +177,7 @@ def generate_13(product, keyword, features="", target="", provider="openai", fra
         s = by_key.get(k, {})
         sections.append({"key": k, "label": SECTION_LABEL[k],
                          "headline": s.get("headline", ""), "sub": s.get("sub", ""),
-                         "items": s.get("items", []) or [], "note": s.get("note", "")})
+                         "items": _norm_items(s.get("items")), "note": s.get("note", "")})
     data["sections"] = sections
     data["provider"] = provider
     data.setdefault("title", product)
