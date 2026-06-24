@@ -99,6 +99,19 @@ def _gallery_section(section_images) -> str:
             "<div style='max-width:680px;margin:0 auto'>" + cards + "</div></section>")
 
 
+def _extra_gallery(images) -> str:
+    """④에서 '상세페이지에 추가'한 이미지 리스트를 갤러리 섹션으로 렌더(없으면 빈 문자열)."""
+    imgs = [u for u in (images or []) if u]
+    if not imgs:
+        return ""
+    cards = "".join(
+        "<img src='" + _e(u) + "' alt='detail' "
+        "style='width:100%;border-radius:14px;margin-top:14px'/>" for u in imgs)
+    return ("<section class='pad center'><div class='kicker'>Gallery</div>"
+            "<h2 class='sec'>추가 이미지</h2><div class='rule'></div>"
+            "<div style='max-width:680px;margin:0 auto'>" + cards + "</div></section>")
+
+
 def _video_section(video_url: str) -> str:
     """영상 URL이 있으면 상세페이지에 <video> 섹션을 렌더(없으면 빈 문자열)."""
     if not video_url:
@@ -111,7 +124,7 @@ def _video_section(video_url: str) -> str:
             "src='" + u + "'></video></section>")
 
 
-def build_detail_html(copy: dict, hero_img: str = "", meta: dict = None, design: dict = None, video_url: str = "", section_images: dict = None) -> str:
+def build_detail_html(copy: dict, hero_img: str = "", meta: dict = None, design: dict = None, video_url: str = "", section_images: dict = None, extra_images: list = None) -> str:
     """copy: {title,bullets,body,tags,image_brief,...}, hero_img: data URI 또는 URL, meta: 사양 dict"""
     copy = copy or {}
     meta = meta or {}
@@ -152,6 +165,7 @@ def build_detail_html(copy: dict, hero_img: str = "", meta: dict = None, design:
     design_css = _design_css(design)
     video_html = _video_section(video_url)
     gallery_html = _gallery_section(section_images)
+    extra_html = _extra_gallery(extra_images)
 
     return f"""<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>{title}</title>
@@ -195,6 +209,7 @@ td .fill{{color:#cd2e3a;font-weight:600;}}
 <p class="lead">{body}</p></section>
 <section class="pad" style="padding-top:0;">{main_slot}</section>
 {gallery_html}
+{extra_html}
 {video_html}
 <section class="pad" style="padding-top:0;"><div class="center"><div class="kicker">Key Point</div><h2 class="sec">핵심 포인트</h2><div class="rule"></div></div>
 <div class="points">{points}</div></section>
@@ -208,7 +223,7 @@ td .fill{{color:#cd2e3a;font-weight:600;}}
 </div></body></html>"""
 
 
-def build_detail_html_13(copy: dict, hero_img: str = "", meta: dict = None, section_images: dict = None, design: dict = None, video_url: str = "") -> str:
+def build_detail_html_13(copy: dict, hero_img: str = "", meta: dict = None, section_images: dict = None, design: dict = None, video_url: str = "", extra_images: list = None) -> str:
     """13섹션 감정여정 카피(dict with 'sections')를 프리미엄 HTML로 렌더."""
     copy = copy or {}
     meta = meta or {}
@@ -262,12 +277,14 @@ def build_detail_html_13(copy: dict, hero_img: str = "", meta: dict = None, sect
     css += " .dlist{max-width:620px;margin:14px auto 0;padding-left:18px;text-align:left;font-size:15px;color:#374151;line-height:1.9} .stripe .dlist{color:#dfe6da} .note{max-width:620px;margin:12px auto 0;color:#888;font-size:13px} .stripe .note{color:#aebaa6}"
     css += _design_css(design)
     video_html = _video_section(video_url)
+    extra_html = _extra_gallery(extra_images)
     return f"""<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>{title}</title>
 <style>{css}</style></head><body><div class="wrap">
 <header class="hero"><h1>{title_html}</h1>{('<p class=tag>'+tagline+'</p>') if tagline else ''}
 <div class="badges">{badges}</div>{hero_visual}</header>
 {blocks}
+{extra_html}
 {video_html}
 <section class="pad"><div class="center"><div class="kicker">Information</div><h2 class="sec">상품 정보</h2><div class="rule"></div></div>
 <table>{spec_rows}</table></section>

@@ -89,6 +89,16 @@ def _items_lines(items):
     return [t for t in (_item_text(i) for i in (items or [])) if t]
 
 
+def _add_detail_image(b64):
+    """생성 이미지(b64)를 상세페이지 추가목록에 넣음(중복 제거·최근 12장 유지)."""
+    uri = "data:image/png;base64," + b64
+    lst = st.session_state.setdefault("detail_images", [])
+    if uri not in lst:
+        lst.append(uri)
+        if len(lst) > 12:
+            st.session_state["detail_images"] = lst[-12:]
+
+
 def mock_keywords(seed):
     base = (seed or "키워드").strip()
     random.seed(base)
@@ -494,13 +504,25 @@ with t3:
                    "title_gap": int(_title_gap), "word_keep": _word_keep, "align": _align,
                    "hero_bg": _hero_bg, "hero_fg": _hero_fg, "accent": _accent}
         st.session_state["design_opts"] = _design
-        _has_vid = bool(st.session_state.get("product_video_url"))
-        _embed_vid = st.checkbox("🎬 상세페이지에 영상 삽입", value=False, key="embed_video",
-                                 disabled=not _has_vid,
-                                 help="④에서 만든 영상을 상세페이지 HTML에 넣습니다. 스마트스토어는 HTML 영상이 제거되니 '동영상 등록란'에 별도 업로드가 필요합니다.")
-        if _has_vid and not _embed_vid:
-            st.caption("ℹ️ ④에서 만든 영상이 있습니다. 위 체크박스를 켜면 상세페이지에 삽입됩니다.")
-        _vid_for_page = st.session_state.get("product_video_url", "") if (_has_vid and _embed_vid) else ""
+        _sess_vid = st.session_state.get("product_video_url", "")
+        # 새 영상이 생기면 체크박스/URL칸에 1회 자동 반영(키 위젯 stale 방지)
+        if _sess_vid and not st.session_state.get("_vid_seeded"):
+            st.session_state["embed_video"] = True
+            st.session_state["vid_url_input"] = _sess_vid
+            st.session_state["_vid_seeded"] = True
+        _embed_vid = st.checkbox("🎬 상세페이지에 영상 삽입", key="embed_video",
+                                 help="④에서 만든 영상이 자동 입력됩니다. mp4 URL을 직접 붙여넣어도 됩니다. (스마트스토어 상세 HTML은 영상이 제거되니 '동영상 등록란'에 별도 업로드)")
+        _vid_for_page = ""
+        if _embed_vid:
+            _vid_for_page = st.text_input("영상 URL", key="vid_url_input",
+                                          placeholder="④에서 영상 생성 시 자동 입력 · 또는 mp4 URL 붙여넣기").strip()
+        _detail_imgs = st.session_state.get("detail_images") or []
+        if _detail_imgs:
+            _di1, _di2 = st.columns([3, 1])
+            _di1.caption("🖼️ ④에서 추가한 이미지 " + str(len(_detail_imgs)) + "장이 상세페이지에 들어갑니다.")
+            if _di2.button("이미지 비우기", key="clear_detail_imgs"):
+                st.session_state["detail_images"] = []
+                _safe_rerun()
         try:
             sec_imgs = st.session_state.get("section_images") or {}
             if sec_imgs:
@@ -509,12 +531,12 @@ with t3:
                 page = detail_template.build_detail_html_13(cr, hero_img=cr.get("hero", ""),
                                                             meta={"상품명": pr_in or cr.get("title", "")},
                                                             section_images=sec_imgs, design=_design,
-                                                            video_url=_vid_for_page)
+                                                            video_url=_vid_for_page, extra_images=_detail_imgs)
             else:
                 page = detail_template.build_detail_html(cr, hero_img=cr.get("hero", ""),
                                                          meta={"상품명": pr_in or cr.get("title", "")},
                                                          design=_design, video_url=_vid_for_page,
-                                                         section_images=sec_imgs)
+                                                         section_images=sec_imgs, extra_images=_detail_imgs)
             components.html(page, height=1000, scrolling=True)
             st.download_button("상세페이지 HTML 다운로드", page.encode("utf-8"), "상세페이지.html", "text/html")
             _editing_id = st.session_state.get("editing_saved_id")
@@ -695,6 +717,7 @@ with t4:
         _bg_use_thumb = st.checkbox("도매꾹 선택상품 썸네일 사용", value=False, key="bg_thumb")
         _bg_sel = st.multiselect("배경 선택(여러 개)", list(image_gen.BACKGROUND_PRESETS.keys()),
                                  default=["순백 스튜디오", "파스텔 핑크", "우드 책상"], key="bg_sel")
+        _bg_add = st.checkbox("✅ 생성 결과를 상세페이지에 추가", value=True, key="bg_add_detail")
         if st.button("배경 버전 생성", key="bg_btn"):
             _bgref = None
             if _bgups is not None:
@@ -729,6 +752,8 @@ with t4:
                             _bdata = image_gen.b64_to_bytes(_b64)
                             st.image(_bdata, caption=f"{_pname} · {_eng}")
                             st.download_button("저장", _bdata, f"bg_{_pname}.png", "image/png", key=f"bg_dl_{_bi}")
+                            if _bg_add:
+                                _add_detail_image(_b64)
                         else:
                             st.error(f"{_pname} 실패: {_err}")
         st.caption("※ 상품은 유지하고 배경만 교체합니다. 로고·글자가 있는 상품은 결과 확인 권장.")
@@ -742,6 +767,7 @@ with t4:
             _mup = st.file_uploader("상품 사진", type=["jpg", "jpeg", "png", "webp"], key="mdl_up")
         _msel = st.multiselect("만들 모델컷", list(image_gen.MODEL_PROMPTS.keys()),
                                default=["여성 모델 전신"], key="mdl_sel")
+        _mdl_add = st.checkbox("✅ 생성 결과를 상세페이지에 추가", value=True, key="mdl_add_detail")
         if st.button("모델 착용컷 생성", key="mdl_btn"):
             _mref, _merr = None, None
             if _msrc == "사진 업로드":
@@ -781,6 +807,8 @@ with t4:
                             _mdata = image_gen.b64_to_bytes(_mb64)
                             st.image(_mdata, caption=_mn + " · " + str(_meng2))
                             st.download_button("저장", _mdata, "model_" + _mn + ".png", "image/png", key="mdl_dl_" + str(_mi))
+                            if _mdl_add:
+                                _add_detail_image(_mb64)
                         else:
                             st.error(_mn + " 실패: " + str(_merr2))
         st.caption("※ 사람·얼굴이 생성됩니다. 실제 상품과 다를 수 있어, 정확한 착용감은 실사 촬영을 권장합니다.")
