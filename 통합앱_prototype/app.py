@@ -273,15 +273,39 @@ with t2:
                 rows, real = sourcing._mock(kw), False
             st.session_state["src_df"] = pd.DataFrame(rows)
             st.session_state["src_real"] = real
+        _url_in = st.text_input("🔗 도매꾹 상품 링크로 소싱 (선택)",
+                                placeholder="도매꾹 상품 페이지 URL 붙여넣기", key="src_url")
+        if st.button("링크로 소싱 추가", key="src_url_btn"):
+            if not _url_in.strip():
+                st.warning("도매꾹 상품 링크를 입력하세요.")
+            elif not use_real:
+                st.info("실데이터 OFF — 링크 소싱은 실데이터 모드(API)에서 동작합니다.")
+            else:
+                _urows, _ureal = sourcing.search_by_url(_url_in)
+                if _urows:
+                    _new = pd.DataFrame(_urows)
+                    if "src_df" in st.session_state and not st.session_state["src_df"].empty:
+                        st.session_state["src_df"] = pd.concat([st.session_state["src_df"], _new], ignore_index=True).drop_duplicates(subset=["링크"], keep="last").reset_index(drop=True)
+                    else:
+                        st.session_state["src_df"] = _new
+                    st.session_state["src_real"] = _ureal or st.session_state.get("src_real", False)
+                    st.success("링크 상품을 소싱 목록에 추가했습니다.")
+                else:
+                    st.warning("링크에서 상품번호를 못 찾았거나 조회 실패. (도매꾹 상품 URL인지 확인)")
         if "src_df" in st.session_state:
             st.caption("출처: " + ("도매꾹 API" if st.session_state.get("src_real") else "모의(폴백)"))
             sdf = st.session_state["src_df"]
+            if "최소주문수량" in sdf.columns:
+                if st.checkbox("최소주문 1개만 보기", key="moq1_only",
+                               help="도매꾹 unitQty(판매단위)=1 인 상품만 표시 (수량 미상은 제외)"):
+                    sdf = sdf[sdf["최소주문수량"] == 1].reset_index(drop=True)
             if not sdf.empty:
                 view = st.radio("보기", ["카드", "표"], horizontal=True, key="src_view")
                 if view == "표":
                     st.dataframe(sdf, use_container_width=True, column_config={
                         "썸네일": st.column_config.ImageColumn("이미지"),
                         "링크": st.column_config.LinkColumn("링크", display_text="상품보기"),
+                        "최소주문수량": st.column_config.NumberColumn("최소주문"),
                     })
                     pick = st.selectbox("상세페이지로 넘길 후보", sdf["상품후보"].tolist())
                     if st.button("이 후보 선택", key="pick_tbl"):
@@ -315,6 +339,9 @@ with t2:
                                     st.markdown(f"**{title[:38]}**")
                                 st.caption(f"{_badge(sc)} · 점수 {sc} · 마진 +{int(row['예상마진']):,}원")
                                 st.caption(f"사입 {int(row['사입원가']):,} → 판매 {int(row['예상판매가']):,}")
+                                _moq = int(row.get("최소주문수량") or 0)
+                                if _moq:
+                                    st.caption("✅ 최소주문 1개" if _moq == 1 else f"⚠️ 최소주문 {_moq}개")
                                 if st.button("이 상품으로 →", key=f"pick_{r0+j}"):
                                     st.session_state["sourcing_pick"] = {"keyword": kw, "product": title, "thumb": str(row.get("썸네일") or "")}
                                     st.success("선택됨 → ③ 상세페이지" + (" (대표이미지 가져온)" if str(row.get("썸네일") or "") else ""))

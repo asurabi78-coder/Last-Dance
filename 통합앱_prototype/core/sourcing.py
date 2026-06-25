@@ -44,7 +44,8 @@ def _mock(keyword):
                      "사입원가": cost, "예상판매가": price, "부대비용": fee,
                      "예상마진": margin,
                      "점수": round(min(100, margin / price * 180), 1),
-                     "출처": "모의", "링크": "", "썸네일": ""})
+                     "출처": "모의", "링크": "", "썸네일": "",
+                     "최소주문수량": random.choice([1, 1, 1, 2, 3])})
     return rows
 
 
@@ -95,6 +96,7 @@ def search(keyword):
                 "출처": "도매꾹API",
                 "링크": _pick(it, "url", "link"),
                 "썸네일": normalize_thumb(_pick(it, "thumb", "thumbnail", "img")),
+                "최소주문수량": _to_int(_pick(it, "unitQty", "minQty", "qty", "minBuyCnt")),
             })
         if not rows:
             return _mock(keyword), False
@@ -102,3 +104,71 @@ def search(keyword):
         return rows, True
     except Exception:
         return _mock(keyword), False
+
+
+def _extract_item_no(url):
+    """도매꾹 상품 링크에서 상품번호(no) 추출."""
+    if not url:
+        return ""
+    u = str(url).strip()
+    m = re.search(r"[?&]no=(\d+)", u)
+    if m:
+        return m.group(1)
+    m = re.search(r"/(\d{6,})(?:[/?#]|$)", u)
+    if m:
+        return m.group(1)
+    m = re.search(r"(\d{6,})", u)
+    return m.group(1) if m else ""
+
+
+def _row_from_view(d, item_no):
+    """getItemView 응답(dict)에서 소싱 행 1건 생성. 가격 없으면 None."""
+    cost = _to_int(_pick(d, "price", "supplyPrice", "lowestPrice", "sellPrice", "amount"))
+    if not cost:
+        p = d.get("price") if isinstance(d, dict) else None
+        if isinstance(p, dict):
+            cost = _to_int(_pick(p, "dome", "sell", "amount", "price", "lib"))
+    if cost <= 0:
+        return None
+    price = int(cost * MARKUP)
+    fee = int(price * 0.12) + 2500
+    margin = price - cost - fee
+    return {
+        "상품후보": _pick(d, "title", "name", "subject") or ("상품 " + str(item_no)),
+        "공급처": "도매꾹",
+        "사입원가": cost, "예상판매가": price, "부대비용": fee, "예상마진": margin,
+        "점수": round(min(100, (margin / price) * 180), 1) if price else 0.0,
+        "출처": "도매꾹API(링크)",
+        "링크": _pick(d, "url", "link") or ("https://domeggook.com/" + str(item_no)),
+        "썸네일": normalize_thumb(_pick(d, "thumb", "thumbnail", "img", "image")),
+        "최소주문수량": _to_int(_pick(d, "unitQty", "minQty", "qty", "minBuyCnt")),
+    }
+
+
+def search_by_url(url):
+    """도매꾹 상품 링크 → getItemView 상세조회 → 단일 후보. (rows, real) 반환."""
+    item_no = _extract_item_no(url)
+    if not item_no:
+        return [], False
+    if not available():
+        r = _mock("링크상품")[:1]
+        if r:
+            r[0]["링크"] = str(url).strip()
+            r[0]["출처"] = "모의(링크)"
+        return r, False
+    try:
+        params = {"ver": "4.5", "mode": "getItemView",
+                  "aid": config.get("DOMEGGOOK_API_KEY"), "no": item_no, "om": "json"}
+        resp = requests.get(API_URL, params=params, timeout=TIMEOUT)
+        if resp.status_code != 200:
+            return [], False
+        data = resp.json()
+        d = data.get("domeggook") if isinstance(data, dict) else None
+        if not isinstance(d, dict):
+            d = data if isinstance(data, dict) else {}
+        if isinstance(d.get("item"), dict):
+            d = d["item"]
+        row = _row_from_view(d, item_no)
+        return ([row], True) if row else ([], False)
+    except Exception:
+        return [], False
