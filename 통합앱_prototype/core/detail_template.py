@@ -177,36 +177,6 @@ def _video_section(video_url: str) -> str:
             "src='" + u + "'></video></section>")
 
 
-def _editable_block() -> str:
-    """직접편집용: 모든 텍스트를 클릭 편집 가능하게 + 떠다니는 저장 버튼/안내 배너 주입."""
-    return (
-        "<div id='__editbar' style='position:fixed;top:0;left:0;right:0;z-index:9999;"
-        "background:#111418;color:#fff;padding:8px 14px;font-size:13px;text-align:center;"
-        "font-family:sans-serif'>\u270f\ufe0f \uc544\ubb34 \uae00\uc790\ub098 \ud074\ub9ad\ud574 \uc9c1\uc811 \uc218\uc815\ud558\uc138\uc694 "
-        "(\ub744\uc5b4\uc4f0\uae30\u00b7\uc904\ubc14\uafc8\u00b7\ub0b4\uc6a9 \ubaa8\ub450 \uac00\ub2a5). \ub2e4 \ub418\uba74 \uc624\ub978\ucabd \uc544\ub798 "
-        "<b>\U0001f4be \uc800\uc7a5</b>\uc744 \ub204\ub974\uc138\uc694.</div>"
-        "<button id='__savebtn' style='position:fixed;bottom:20px;right:20px;z-index:9999;"
-        "background:#c8a04b;color:#1a1a1a;font-weight:800;border:none;padding:14px 22px;"
-        "border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.3);cursor:pointer;font-size:15px;"
-        "font-family:sans-serif'>\U0001f4be \uc800\uc7a5</button>"
-        "<script>(function(){"
-        "document.body.style.paddingTop='40px';"
-        "document.querySelectorAll('.wrap h1,.wrap h2,.wrap h3,.wrap h4,.wrap p,.wrap li,.wrap td,.wrap th,.wrap span')"
-        ".forEach(function(el){el.setAttribute('contenteditable','true');});"
-        "document.getElementById('__savebtn').addEventListener('click',function(){"
-        "var c=document.documentElement.cloneNode(true);"
-        "['#__editbar','#__savebtn'].forEach(function(q){var n=c.querySelector(q);if(n)n.remove();});"
-        "c.querySelectorAll('[contenteditable]').forEach(function(el){el.removeAttribute('contenteditable');});"
-        "c.querySelectorAll('script').forEach(function(el){el.remove();});"
-        "var bd=c.querySelector('body');if(bd)bd.style.paddingTop='';"
-        "var html='<!DOCTYPE html>'+c.outerHTML;"
-        "var a=document.createElement('a');"
-        "a.href=URL.createObjectURL(new Blob([html],{type:'text/html'}));"
-        "a.download='\uc0c1\uc138\ud398\uc774\uc9c0_\ud3b8\uc9d1\ubcf8.html';a.click();"
-        "});})();</script>"
-    )
-
-
 def build_detail_html(copy: dict, hero_img: str = "", meta: dict = None, design: dict = None, video_url: str = "", section_images: dict = None, extra_images: list = None, editable: bool = False) -> str:
     """copy: {title,bullets,body,tags,image_brief,...}, hero_img: data URI 또는 URL, meta: 사양 dict"""
     copy = copy or {}
