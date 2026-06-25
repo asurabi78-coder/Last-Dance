@@ -11,6 +11,14 @@ TIMEOUT = 120
 EXPAND_MAX_WORKERS = 3   # 장면 동시 생성 수(이미지 API 429/과금 보호)
 
 
+# 연출 방향: 인물 포함 여부 클로즈(프롬프트에 덧붙임)
+PERSON_CLAUSES = {
+    "자동": "",
+    "제품만(인물 없음)": "Show the product only, with no people, no human, no face, no model in the frame; focus entirely on the product.",
+    "인물 포함(얼굴까지)": "Include a real human model together with the product; show the person's face clearly and naturally.",
+}
+
+
 def available_gemini() -> bool:
     return config.present("GEMINI_API_KEY")
 
@@ -213,8 +221,10 @@ def edit_image(image_bytes, prompt, provider="auto"):
     raise RuntimeError(" / ".join(errors) or "사용 가능한 편집 엔진 없음")
 
 
-def _expand_one(image_bytes, scene, provider):
+def _expand_one(image_bytes, scene, provider, direction=""):
     prompt = SCENE_PROMPTS.get(scene, scene)
+    if direction:
+        prompt = prompt + " " + direction
     try:
         imgs, eng = edit_image(image_bytes, prompt, provider=provider)
         return (scene, imgs[0], eng, None)
@@ -222,14 +232,14 @@ def _expand_one(image_bytes, scene, provider):
         return (scene, None, None, str(e)[:120])
 
 
-def expand_from_reference(image_bytes, scenes, provider="auto"):
+def expand_from_reference(image_bytes, scenes, provider="auto", direction=""):
     """선택한 장면들을 동시 생성. [(scene, b64, engine|None, err|None)] 입력 순서대로 반환."""
     scenes = list(scenes)
     if not scenes:
         return []
     with ThreadPoolExecutor(max_workers=EXPAND_MAX_WORKERS) as ex:
         # map은 입력 순서대로 결과를 돌려줌 → 기존 반환 순서와 동일
-        return list(ex.map(lambda s: _expand_one(image_bytes, s, provider), scenes))
+        return list(ex.map(lambda s: _expand_one(image_bytes, s, provider, direction), scenes))
 
 
 # ---------- 배경 다양화 프리셋(자체 작성) ----------
@@ -249,7 +259,7 @@ BACKGROUND_PRESETS = {
 }
 
 
-def expand_backgrounds(image_bytes, presets, provider="auto"):
+def expand_backgrounds(image_bytes, presets, provider="auto", direction=""):
     """선택한 배경 프리셋들로 상품 배경만 교체. [(preset, b64, engine|None, err|None)] 입력 순서대로 반환."""
     presets = list(presets)
     if not presets:
@@ -257,6 +267,8 @@ def expand_backgrounds(image_bytes, presets, provider="auto"):
 
     def _one(name):
         prompt = BACKGROUND_PRESETS.get(name, name)
+        if direction:
+            prompt = prompt + " " + direction
         try:
             imgs, eng = edit_image(image_bytes, prompt, provider=provider)
             return (name, imgs[0], eng, None)
@@ -277,7 +289,7 @@ MODEL_PROMPTS = {
 }
 
 
-def expand_models(image_bytes, presets, provider="auto"):
+def expand_models(image_bytes, presets, provider="auto", direction=""):
     """상품 사진 → 모델이 착용한 컷. [(preset, b64, engine|None, err|None)] 입력 순서대로 반환."""
     presets = list(presets)
     if not presets:
@@ -285,6 +297,8 @@ def expand_models(image_bytes, presets, provider="auto"):
 
     def _one(name):
         prompt = MODEL_PROMPTS.get(name, name)
+        if direction:
+            prompt = prompt + " " + direction
         try:
             imgs, eng = edit_image(image_bytes, prompt, provider=provider)
             return (name, imgs[0], eng, None)

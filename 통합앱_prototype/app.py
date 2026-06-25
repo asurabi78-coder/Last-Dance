@@ -666,6 +666,8 @@ with t4:
                                 help="②소싱에서 선택한 상품 썸네일을 기준 이미지로 사용")
         scenes = st.multiselect("만들 구간 이미지", list(image_gen.SCENE_PROMPTS.keys()),
                                 default=list(image_gen.SCENE_PROMPTS.keys()), key="exp_scenes")
+        _exp_dir = st.text_input("🎬 연출 지시(선택)", placeholder="예: 얼굴 자연스럽게 / 제품 클로즈업 / 밝고 화사하게", key="exp_dir")
+        _exp_person = st.radio("인물", ["자동", "제품만(인물 없음)", "인물 포함(얼굴까지)"], horizontal=True, key="exp_person")
         if st.button("구간 이미지 생성", key="exp_btn"):
             ref = None
             if ups:
@@ -692,7 +694,8 @@ with t4:
                 st.warning("만들 구간 이미지를 1개 이상 선택하세요.")
             else:
                 st.image(ref, caption="기준 사진", width=200)
-                results = image_gen.expand_from_reference(ref, scenes)
+                _exp_d = (image_gen.PERSON_CLAUSES.get(_exp_person, "") + " " + _exp_dir).strip()
+                results = image_gen.expand_from_reference(ref, scenes, direction=_exp_d)
                 gcols = st.columns(2)
                 for i, (scene, b64, eng, err) in enumerate(results):
                     with gcols[i % 2]:
@@ -717,6 +720,8 @@ with t4:
         _bg_use_thumb = st.checkbox("도매꾹 선택상품 썸네일 사용", value=False, key="bg_thumb")
         _bg_sel = st.multiselect("배경 선택(여러 개)", list(image_gen.BACKGROUND_PRESETS.keys()),
                                  default=["순백 스튜디오", "파스텔 핑크", "우드 책상"], key="bg_sel")
+        _bg_dir = st.text_input("🎬 연출 지시(선택)", placeholder="예: 인물 포함 / 그림자 강하게 / 미니멀하게", key="bg_dir")
+        _bg_person = st.radio("인물", ["자동", "제품만(인물 없음)", "인물 포함(얼굴까지)"], horizontal=True, key="bg_person")
         _bg_add = st.checkbox("✅ 생성 결과를 상세페이지에 추가", value=True, key="bg_add_detail")
         if st.button("배경 버전 생성", key="bg_btn"):
             _bgref = None
@@ -744,7 +749,8 @@ with t4:
             else:
                 st.image(_bgref, caption="기준 사진", width=200)
                 with st.spinner(f"{len(_bg_sel)}개 배경 생성 중…"):
-                    _bgres = image_gen.expand_backgrounds(_bgref, _bg_sel)
+                    _bg_d = (image_gen.PERSON_CLAUSES.get(_bg_person, "") + " " + _bg_dir).strip()
+                    _bgres = image_gen.expand_backgrounds(_bgref, _bg_sel, direction=_bg_d)
                 _bgcols = st.columns(2)
                 for _bi, (_pname, _b64, _eng, _err) in enumerate(_bgres):
                     with _bgcols[_bi % 2]:
@@ -767,6 +773,7 @@ with t4:
             _mup = st.file_uploader("상품 사진", type=["jpg", "jpeg", "png", "webp"], key="mdl_up")
         _msel = st.multiselect("만들 모델컷", list(image_gen.MODEL_PROMPTS.keys()),
                                default=["여성 모델 전신"], key="mdl_sel")
+        _mdl_dir = st.text_input("🎬 연출 지시(선택)", placeholder="예: 얼굴 클로즈업 / 야외 햇살 / 정면 포즈", key="mdl_dir")
         _mdl_add = st.checkbox("✅ 생성 결과를 상세페이지에 추가", value=True, key="mdl_add_detail")
         if st.button("모델 착용컷 생성", key="mdl_btn"):
             _mref, _merr = None, None
@@ -799,7 +806,7 @@ with t4:
             else:
                 st.image(_mref, caption="기준 상품 사진", width=180)
                 with st.spinner(str(len(_msel)) + "개 모델컷 생성 중…"):
-                    _mres = image_gen.expand_models(_mref, _msel, provider=_mprov)
+                    _mres = image_gen.expand_models(_mref, _msel, provider=_mprov, direction=_mdl_dir.strip())
                 _mcols = st.columns(2)
                 for _mi, (_mn, _mb64, _meng2, _merr2) in enumerate(_mres):
                     with _mcols[_mi % 2]:

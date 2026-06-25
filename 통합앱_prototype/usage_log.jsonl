@@ -81,3 +81,5 @@
 {"ts": 1782288846.8183486, "date": "2026-06-24", "provider": "openai", "model": "gpt-image-1", "kind": "image", "in_tokens": 0, "out_tokens": 0, "images": 1, "cost": 0.04}
 {"ts": 1782288912.3814871, "date": "2026-06-24", "provider": "anthropic", "model": "claude-sonnet-4-6", "kind": "text", "in_tokens": 699, "out_tokens": 5039, "images": 0, "cost": 0.077682}
 {"ts": 1782288988.2452369, "date": "2026-06-24", "provider": "anthropic", "model": "claude-sonnet-4-6", "kind": "text", "in_tokens": 5015, "out_tokens": 4964, "images": 0, "cost": 0.089505}
+{"ts": 1782289544.2049088, "date": "2026-06-24", "provider": "openai", "model": "gpt-4o-mini", "kind": "text", "in_tokens": 502, "out_tokens": 1440, "images": 0, "cost": 0.000939}
+{"ts": 1782289567.2976117, "date": "2026-06-24", "provider": "openai", "model": "gpt-4o-mini", "kind": "text", "in_tokens": 1471, "out_tokens": 1260, "images": 0, "cost": 0.000977}
