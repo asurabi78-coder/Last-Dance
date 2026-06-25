@@ -539,6 +539,22 @@ with t3:
                                                          section_images=sec_imgs, extra_images=_detail_imgs)
             components.html(page, height=1000, scrolling=True)
             st.download_button("상세페이지 HTML 다운로드", page.encode("utf-8"), "상세페이지.html", "text/html")
+            if cr.get("sections"):
+                _edit_page = detail_template.build_detail_html_13(cr, hero_img=cr.get("hero", ""),
+                                                                  meta={"상품명": pr_in or cr.get("title", "")},
+                                                                  section_images=sec_imgs, design=_design,
+                                                                  video_url=_vid_for_page, extra_images=_detail_imgs,
+                                                                  editable=True)
+            else:
+                _edit_page = detail_template.build_detail_html(cr, hero_img=cr.get("hero", ""),
+                                                               meta={"상품명": pr_in or cr.get("title", "")},
+                                                               design=_design, video_url=_vid_for_page,
+                                                               section_images=sec_imgs, extra_images=_detail_imgs,
+                                                               editable=True)
+            st.download_button("✏️ 직접 편집용 HTML 다운로드 (글자 클릭해 수정)", _edit_page.encode("utf-8"),
+                               "상세페이지_편집용.html", "text/html", key="edit_dl",
+                               help="받은 파일을 브라우저로 열고 → 아무 글자나 클릭해 띄어쓰기·줄바꿈·내용 수정 → 우측 하단 💾 저장")
+            st.caption("✏️ '직접 편집용' 파일은 브라우저로 열어 글자를 클릭해 바로 고칠 수 있습니다(저장 버튼으로 보관).")
             _editing_id = st.session_state.get("editing_saved_id")
             if _editing_id:
                 st.caption(f"저장함 항목 편집 중: {_editing_id}")
