@@ -581,7 +581,12 @@ with t3:
             st.download_button("✏️ 직접 편집용 HTML 다운로드 (글자 클릭해 수정)", _edit_page.encode("utf-8"),
                                "상세페이지_편집용.html", "text/html", key="edit_dl",
                                help="받은 파일을 브라우저로 열고 → 아무 글자나 클릭해 띄어쓰기·줄바꿈·내용 수정 → 우측 하단 💾 저장")
-            st.caption("✏️ '직접 편집용' 파일은 브라우저로 열어 글자를 클릭해 바로 고칠 수 있습니다(저장 버튼으로 보관).")
+            st.caption("✏️ '직접 편집용' 파일은 브라우저로 열어 글자를 클릭해 수정하고, 우측 아래 '📷 이미지로 저장'으로 PNG를 받아 스마트스토어에 이미지로 업로드하세요(가장 확실).")
+            _ss_html = detail_template.build_smartstore_html(cr, meta={"상품명": pr_in or cr.get("title", "")},
+                                                             section_images=sec_imgs, extra_images=_detail_imgs)
+            st.download_button("🟢 스마트스토어용 HTML 다운로드 (인라인·표/스크립트 제거)", _ss_html.encode("utf-8"),
+                               "스마트스토어_상세.html", "text/html", key="ss_dl",
+                               help="스마트에디터 ONE의 'HTML' 모드 붙여넣기용. style/script/table/a 제거·인라인 스타일. (이미지는 스토어 정책상 막힐 수 있어 이미지 저장 방식 권장)")
             _editing_id = st.session_state.get("editing_saved_id")
             if _editing_id:
                 st.caption(f"저장함 항목 편집 중: {_editing_id}")

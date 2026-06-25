@@ -125,6 +125,59 @@ def _video_section(video_url: str) -> str:
 
 
 def _editable_block() -> str:
+    """직접편집용: 텍스트 클릭 편집 + 'HTML 저장' + '이미지로 저장'(스마트스토어용) 버튼."""
+    return (
+        "<div id='__editbar' style='position:fixed;top:0;left:0;right:0;z-index:9999;"
+        "background:#111418;color:#fff;padding:8px 14px;font-size:13px;text-align:center;"
+        "font-family:sans-serif'>\u270f\ufe0f \uae00\uc790 \ud074\ub9ad\ud574 \uc218\uc815 \u00b7 \uc6b0\uce21 \uc544\ub798 "
+        "<b>\U0001f4f7 \uc774\ubbf8\uc9c0\ub85c \uc800\uc7a5</b>(\uc2a4\ub9c8\ud2b8\uc2a4\ud1a0\uc5b4\uc6a9) \ub610\ub294 <b>\U0001f4be HTML \uc800\uc7a5</b></div>"
+        "<button id='__imgbtn' style='position:fixed;bottom:20px;right:20px;z-index:9999;"
+        "background:#03c75a;color:#fff;font-weight:800;border:none;padding:14px 20px;border-radius:999px;"
+        "box-shadow:0 4px 14px rgba(0,0,0,.3);cursor:pointer;font-size:15px;font-family:sans-serif'>"
+        "\U0001f4f7 \uc774\ubbf8\uc9c0\ub85c \uc800\uc7a5</button>"
+        "<button id='__savebtn' style='position:fixed;bottom:20px;right:185px;z-index:9999;"
+        "background:#c8a04b;color:#1a1a1a;font-weight:800;border:none;padding:14px 20px;border-radius:999px;"
+        "box-shadow:0 4px 14px rgba(0,0,0,.3);cursor:pointer;font-size:15px;font-family:sans-serif'>"
+        "\U0001f4be HTML \uc800\uc7a5</button>"
+        "<script src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'></script>"
+        "<script>(function(){"
+        "document.body.style.paddingTop='40px';"
+        "document.querySelectorAll('.wrap h1,.wrap h2,.wrap h3,.wrap h4,.wrap p,.wrap li,.wrap td,.wrap th,.wrap span')"
+        ".forEach(function(el){el.setAttribute('contenteditable','true');});"
+        "document.getElementById('__savebtn').addEventListener('click',function(){"
+        "var c=document.documentElement.cloneNode(true);"
+        "['#__editbar','#__savebtn','#__imgbtn'].forEach(function(q){var n=c.querySelector(q);if(n)n.remove();});"
+        "c.querySelectorAll('[contenteditable]').forEach(function(el){el.removeAttribute('contenteditable');});"
+        "c.querySelectorAll('script').forEach(function(el){el.remove();});"
+        "var bd=c.querySelector('body');if(bd)bd.style.paddingTop='';"
+        "var a=document.createElement('a');"
+        "a.href=URL.createObjectURL(new Blob(['<!DOCTYPE html>'+c.outerHTML],{type:'text/html'}));"
+        "a.download='\uc0c1\uc138\ud398\uc774\uc9c0_\ud3b8\uc9d1\ubcf8.html';a.click();});"
+        "document.getElementById('__imgbtn').addEventListener('click',function(){"
+        "var btn=this;btn.textContent='\u2026 \uc0dd\uc131\uc911';"
+        "if(typeof html2canvas==='undefined'){alert('\uc774\ubbf8\uc9c0 \ub77c\uc774\ube0c\ub7ec\ub9ac \ub85c\ub529 \uc911 \u2014 \uc7a0\uc2dc \ud6c4 \ub2e4\uc2dc');btn.textContent='\U0001f4f7 \uc774\ubbf8\uc9c0\ub85c \uc800\uc7a5';return;}"
+        "html2canvas(document.querySelector('.wrap'),{useCORS:true,scale:2,backgroundColor:'#ffffff'}).then(function(cv){"
+        "var a=document.createElement('a');a.href=cv.toDataURL('image/png');a.download='\uc0c1\uc138\ud398\uc774\uc9c0.png';a.click();"
+        "btn.textContent='\U0001f4f7 \uc774\ubbf8\uc9c0\ub85c \uc800\uc7a5';"
+        "}).catch(function(e){alert('\uc774\ubbf8\uc9c0 \uc0dd\uc131 \uc2e4\ud328(\uc678\ubd80 \uc774\ubbf8\uc9c0\uac00 \uc788\uc73c\uba74 \ub9c9\ud790 \uc218 \uc788\uc74c): '+e);"
+        "btn.textContent='\U0001f4f7 \uc774\ubbf8\uc9c0\ub85c \uc800\uc7a5';});});"
+        "})();</script>"
+    )
+
+
+def _video_section(video_url: str) -> str:
+    """영상 URL이 있으면 상세페이지에 <video> 섹션을 렌더(없으면 빈 문자열)."""
+    if not video_url:
+        return ""
+    u = _e(video_url)
+    return ("<section class='pad center'><div class='kicker'>Video</div>"
+            "<h2 class='sec'>영상으로 보기</h2><div class='rule'></div>"
+            "<video controls preload='metadata' playsinline "
+            "style='width:100%;max-width:680px;border-radius:14px;margin-top:18px' "
+            "src='" + u + "'></video></section>")
+
+
+def _editable_block() -> str:
     """직접편집용: 모든 텍스트를 클릭 편집 가능하게 + 떠다니는 저장 버튼/안내 배너 주입."""
     return (
         "<div id='__editbar' style='position:fixed;top:0;left:0;right:0;z-index:9999;"
@@ -323,3 +376,66 @@ def build_detail_html_13(copy: dict, hero_img: str = "", meta: dict = None, sect
 <section class="pad center" style="padding-top:0;"><p style="color:#888;font-size:13px;">{tag_line}</p></section>
 <div class="foot">상세페이지 (13섹션 감정여정) · Cowork 통합앱 생성 · 사양·이미지는 공급사 자료로 교체하세요</div>
 </div>{editable_block}</body></html>"""
+
+
+def build_smartstore_html(copy: dict, meta: dict = None, section_images: dict = None, extra_images: list = None) -> str:
+    """스마트스토어 HTML 직접입력용: 인라인 스타일 프래그먼트.
+    <style>/<script>/<head>/<body>/<table>/<a>/<video> 미사용 — 인라인 style만."""
+    copy = copy or {}
+    meta = meta or {}
+    section_images = section_images or {}
+    title = _e(str(copy.get("title", "상품 상세페이지") or "")).replace("\r\n", " ").replace("\n", " ")
+    tags = [t for t in (copy.get("tags") or []) if t]
+    o = ["<div style='max-width:760px;margin:0 auto;font-family:sans-serif;color:#111418;line-height:1.7'>"]
+    o.append("<div style='background:#111418;color:#fff;padding:40px 24px;text-align:center'>")
+    o.append("<div style='font-size:30px;font-weight:900;word-break:keep-all'>" + title + "</div>")
+    if copy.get("tagline"):
+        o.append("<div style='margin-top:12px;font-size:15px;color:#e5e7eb'>" + _e(copy.get("tagline")) + "</div>")
+    o.append("</div>")
+    has_sections = bool(copy.get("sections"))
+    for sec in (copy.get("sections") or []):
+        if sec.get("key") == "hero":
+            continue
+        hl = _e(sec.get("headline", ""))
+        sub = _e(sec.get("sub", ""))
+        items = [_item_text(i) for i in (sec.get("items") or []) if _item_text(i)]
+        note = _e(sec.get("note", ""))
+        simg = section_images.get(sec.get("key", ""), "")
+        if not (hl or sub or items or note or simg):
+            continue
+        o.append("<div style='padding:36px 24px;text-align:center;border-top:1px solid #eee'>")
+        if sec.get("label"):
+            o.append("<div style='font-size:12px;letter-spacing:2px;color:#c8a04b;font-weight:700'>" + _e(sec.get("label")) + "</div>")
+        if hl:
+            o.append("<div style='font-size:24px;font-weight:800;margin-top:8px;word-break:keep-all'>" + hl + "</div>")
+        if sub:
+            o.append("<div style='font-size:16px;color:#555;margin-top:12px;word-break:keep-all'>" + sub + "</div>")
+        for it in items:
+            o.append("<div style='font-size:15px;color:#374151;margin-top:8px;word-break:keep-all'>\u2022 " + _e(it) + "</div>")
+        if note:
+            o.append("<div style='font-size:13px;color:#888;margin-top:10px'>" + note + "</div>")
+        if simg:
+            o.append("<div style='margin-top:16px'><img src='" + _e(simg) + "' style='max-width:100%;border-radius:12px' alt='detail'/></div>")
+        o.append("</div>")
+    if not has_sections:
+        for b in [x for x in (copy.get("bullets") or []) if x]:
+            o.append("<div style='padding:6px 24px;text-align:center;font-size:15px;color:#374151'>\u2022 " + _e(b) + "</div>")
+        if copy.get("body"):
+            o.append("<div style='padding:12px 24px 24px;text-align:center;font-size:16px;color:#4b5563'>" + _e(copy.get("body")) + "</div>")
+    for u in (extra_images or []):
+        if u:
+            o.append("<div style='padding:0 24px 16px;text-align:center'><img src='" + _e(u) + "' style='max-width:100%;border-radius:12px' alt='detail'/></div>")
+    o.append("<div style='padding:36px 24px;border-top:1px solid #eee'>")
+    o.append("<div style='font-size:20px;font-weight:800;text-align:center;margin-bottom:16px'>상품 정보</div>")
+    for kk, vv in [("상품명", meta.get("상품명", copy.get("title", ""))),
+                   ("소재", meta.get("소재", "※ 공급사 확인 후 입력")),
+                   ("사이즈", meta.get("사이즈", "※ 공급사 사이즈표")),
+                   ("제조국", meta.get("제조국", "※ 확인 후 입력"))]:
+        o.append("<div style='display:flex;border-bottom:1px solid #eee;padding:10px 0'>"
+                 "<div style='width:30%;font-weight:700;color:#555'>" + _e(kk) + "</div>"
+                 "<div style='width:70%'>" + _e(vv) + "</div></div>")
+    o.append("</div>")
+    if tags:
+        o.append("<div style='padding:16px 24px;text-align:center;color:#888;font-size:13px'>" + _e(" ".join("#" + t for t in tags)) + "</div>")
+    o.append("</div>")
+    return "".join(o)
